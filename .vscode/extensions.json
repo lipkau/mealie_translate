@@ -1,0 +1,25 @@
+{
+  "recommendations": [
+    // Python Development
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.debugpy",
+
+    // Code Quality & Linting
+    "charliermarsh.ruff",
+
+    // Documentation & Markdown
+    "davidanson.vscode-markdownlint",
+
+    // Container Development
+    "ms-azuretools.vscode-docker",
+
+    // General Development
+    "esbenp.prettier-vscode"
+  ],
+  "unwantedRecommendations": [
+    // Deprecated or conflicting extensions
+    "ms-python.pylint",
+    "charliermarsh.ruff"
+  ]
+}

@@ -1,0 +1,205 @@
+name: Continuous Deployment
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_run:
+    workflows: ["Continuous Integration"]
+    types: [completed]
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Only run deployment if CI passed
+  check-ci-status:
+    name: Check CI Status
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_run'
+    outputs:
+      ci-passed: ${{ steps.check.outputs.result }}
+    steps:
+      - name: Check CI workflow result
+        id: check
+        run: |
+          if [ "${{ github.event.workflow_run.conclusion }}" == "success" ]; then
+            echo "result=true" >> $GITHUB_OUTPUT
+          else
+            echo "result=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+  docker-build-and-push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    # Run on direct push to main, tags, or after successful CI workflow
+    if: |
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_run' && needs.check-ci-status.outputs.ci-passed == 'true')
+    needs: [check-ci-status]
+    # Allow needs to be skipped for direct push events
+    continue-on-error: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # For workflow_run events, checkout the commit that triggered the original workflow
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Development image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: development
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push Production image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: production
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Generate build metadata
+        run: |
+          echo "Build completed at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" > build-metadata.txt
+          echo "Git commit: ${{ github.sha }}" >> build-metadata.txt
+          echo "Git ref: ${{ github.ref }}" >> build-metadata.txt
+          echo "Actor: ${{ github.actor }}" >> build-metadata.txt
+          echo "Event: ${{ github.event_name }}" >> build-metadata.txt
+          echo "Registry: ${{ env.REGISTRY }}" >> build-metadata.txt
+          echo "Image: ${{ env.IMAGE_NAME }}" >> build-metadata.txt
+          echo "Tags: ${{ steps.meta.outputs.tags }}" >> build-metadata.txt
+          echo "Labels: ${{ steps.meta.outputs.labels }}" >> build-metadata.txt
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-metadata
+          path: |
+            build-metadata.txt
+          retention-days: 90
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: docker-build-and-push
+
+    steps:
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          format: "sarif"
+          output: "trivy-results.sarif"
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: "trivy-results.sarif"
+
+      - name: Generate detailed Trivy report
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          format: "json"
+          output: "trivy-report.json"
+
+      - name: Upload CD security artifacts
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: cd-security-scan
+          path: |
+            trivy-results.sarif
+            trivy-report.json
+          retention-days: 90
+
+  # Optional: Deploy to staging/production environments
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [docker-build-and-push, security-scan]
+    if: github.ref == 'refs/heads/main'
+    environment: staging
+
+    steps:
+      - name: Deploy to staging
+        run: |
+          echo "Deploying ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest to staging"
+          echo "Deployment started at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" > staging-deployment.log
+          echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> staging-deployment.log
+          echo "Commit: ${{ github.sha }}" >> staging-deployment.log
+          echo "Environment: staging" >> staging-deployment.log
+          # Add your staging deployment commands here
+          # For example: kubectl, docker-compose, or API calls to your hosting platform
+          echo "Deployment completed at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> staging-deployment.log
+
+      - name: Upload staging deployment artifacts
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: staging-deployment-logs
+          path: staging-deployment.log
+          retention-days: 30
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [docker-build-and-push, security-scan]
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: production
+
+    steps:
+      - name: Deploy to production
+        run: |
+          echo "Deploying ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} to production"
+          echo "Production deployment started at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" > production-deployment.log
+          echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}" >> production-deployment.log
+          echo "Tag: ${{ github.ref_name }}" >> production-deployment.log
+          echo "Commit: ${{ github.sha }}" >> production-deployment.log
+          echo "Environment: production" >> production-deployment.log
+          # Add your production deployment commands here
+          # For example: kubectl, docker-compose, or API calls to your hosting platform
+          echo "Production deployment completed at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> production-deployment.log
+
+      - name: Upload production deployment artifacts
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: production-deployment-logs
+          path: production-deployment.log
+          retention-days: 90

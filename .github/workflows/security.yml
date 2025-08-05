@@ -1,0 +1,318 @@
+name: Security Scanning
+
+on:
+  # Trigger after successful CD deployment
+  workflow_run:
+    workflows: ["Continuous Deployment"]
+    types: [completed]
+    branches: [main]
+
+  # Allow manual trigger for security audits
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Docker image tag to scan (defaults to latest)"
+        required: false
+        default: "latest"
+        type: string
+
+  # Weekly security audit
+  schedule:
+    - cron: "0 2 * * 1" # Every Monday at 2 AM UTC
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Only run if CD workflow succeeded
+  check-cd-status:
+    name: Check CD Status
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_run'
+    outputs:
+      cd-passed: ${{ steps.check.outputs.result }}
+      should-scan: ${{ steps.check.outputs.should-scan }}
+    steps:
+      - name: Check CD workflow result
+        id: check
+        run: |
+          if [ "${{ github.event.workflow_run.conclusion }}" == "success" ]; then
+            echo "result=true" >> $GITHUB_OUTPUT
+            echo "should-scan=true" >> $GITHUB_OUTPUT
+          else
+            echo "result=false" >> $GITHUB_OUTPUT
+            echo "should-scan=false" >> $GITHUB_OUTPUT
+          fi
+
+  python-security-scan:
+    name: Python Code Security
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_run' && needs.check-cd-status.outputs.should-scan == 'true')
+    needs: [check-cd-status]
+    continue-on-error: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.13"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-security-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-security-
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+
+      - name: Run Python security scan with bandit
+        run: |
+          make security-bandit PYTHON=python
+        continue-on-error: true
+
+      - name: Run dependency vulnerability scan with pip-audit
+        run: |
+          make security-pip-audit PYTHON=python
+        continue-on-error: true
+
+      - name: Upload Python security reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: python-security-reports-${{ github.run_id }}
+          path: |
+            bandit-report.json
+            pip-audit-report.json
+          retention-days: 90
+
+  docker-security-scan:
+    name: Docker Image Security
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_run' && needs.check-cd-status.outputs.should-scan == 'true')
+    needs: [check-cd-status]
+    continue-on-error: false
+
+    strategy:
+      matrix:
+        image-tag: [latest, dev]
+
+    steps:
+      - name: Determine image to scan
+        id: image
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ -n "${{ github.event.inputs.image_tag }}" ]; then
+            echo "tag=${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${{ matrix.image-tag }}" >> $GITHUB_OUTPUT
+          fi
+          echo "full-name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.image-tag }}" >> $GITHUB_OUTPUT
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.image.outputs.full-name }}
+          format: "sarif"
+          output: "trivy-results-${{ steps.image.outputs.tag }}.sarif"
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: "trivy-results-${{ steps.image.outputs.tag }}.sarif"
+          category: "docker-${{ steps.image.outputs.tag }}"
+
+      - name: Run Trivy for detailed JSON report
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.image.outputs.full-name }}
+          format: "json"
+          output: "trivy-report-${{ steps.image.outputs.tag }}.json"
+
+      - name: Run Trivy for console output (visible vulnerabilities)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.image.outputs.full-name }}
+          format: "table"
+        continue-on-error: true
+
+      - name: Run Trivy for table report
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.image.outputs.full-name }}
+          format: "table"
+          output: "trivy-table-${{ steps.image.outputs.tag }}.txt"
+        continue-on-error: true
+
+      - name: Upload Docker security reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: docker-security-reports-${{ steps.image.outputs.tag }}-${{ github.run_id }}
+          path: |
+            trivy-results-${{ steps.image.outputs.tag }}.sarif
+            trivy-report-${{ steps.image.outputs.tag }}.json
+            trivy-table-${{ steps.image.outputs.tag }}.txt
+          retention-days: 90
+
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs: [check-cd-status, python-security-scan, docker-security-scan]
+    if: always() && (needs.python-security-scan.result != 'skipped' || needs.docker-security-scan.result != 'skipped')
+
+    steps:
+      - name: Download all security reports
+        uses: actions/download-artifact@v3
+
+      - name: Analyze Docker vulnerabilities
+        run: |
+          echo "## 🐳 Docker Vulnerability Summary" > docker-vuln-summary.md
+          echo "" >> docker-vuln-summary.md
+
+          # Check if we have any Docker security reports
+          for report_dir in docker-security-reports-*; do
+            if [ -d "$report_dir" ]; then
+              echo "### Image: ${report_dir##*-docker-security-reports-}" >> docker-vuln-summary.md
+
+              # Look for JSON reports to count vulnerabilities
+              for json_file in "$report_dir"/*.json; do
+                if [ -f "$json_file" ]; then
+                  # Count vulnerabilities by severity using jq if available
+                  if command -v jq >/dev/null 2>&1; then
+                    critical=$(jq -r '.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL") | .VulnerabilityID' "$json_file" 2>/dev/null | wc -l || echo "0")
+                    high=$(jq -r '.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH") | .VulnerabilityID' "$json_file" 2>/dev/null | wc -l || echo "0")
+                    medium=$(jq -r '.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM") | .VulnerabilityID' "$json_file" 2>/dev/null | wc -l || echo "0")
+                    low=$(jq -r '.Results[]?.Vulnerabilities[]? | select(.Severity=="LOW") | .VulnerabilityID' "$json_file" 2>/dev/null | wc -l || echo "0")
+
+                    echo "- 🔴 Critical: $critical" >> docker-vuln-summary.md
+                    echo "- 🟠 High: $high" >> docker-vuln-summary.md
+                    echo "- 🟡 Medium: $medium" >> docker-vuln-summary.md
+                    echo "- 🟢 Low: $low" >> docker-vuln-summary.md
+                  else
+                    echo "- Report available in artifacts" >> docker-vuln-summary.md
+                  fi
+                  echo "" >> docker-vuln-summary.md
+                fi
+              done
+            fi
+          done
+
+      - name: Create security summary
+        run: |
+          echo "# 🔒 Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Scan triggered by:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Repository:** ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Python security status
+          if [ "${{ needs.python-security-scan.result }}" == "success" ]; then
+            echo "✅ **Python Security Scan:** Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Python Security Scan:** Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Docker security status
+          if [ "${{ needs.docker-security-scan.result }}" == "success" ]; then
+            echo "✅ **Docker Security Scan:** Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Docker Security Scan:** Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📊 **Detailed reports available in workflow artifacts**" >> $GITHUB_STEP_SUMMARY
+
+          # Include Docker vulnerability summary if available
+          if [ -f "docker-vuln-summary.md" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            cat docker-vuln-summary.md >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Create comprehensive security report
+        run: |
+          echo "# Security Scan Summary Report" > security-summary.md
+          echo "" >> security-summary.md
+          echo "**Repository:** ${{ github.repository }}" >> security-summary.md
+          echo "**Scan Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> security-summary.md
+          echo "**Triggered By:** ${{ github.event_name }}" >> security-summary.md
+          echo "**Commit:** ${{ github.sha }}" >> security-summary.md
+          echo "**Run ID:** ${{ github.run_id }}" >> security-summary.md
+          echo "" >> security-summary.md
+          echo "## Results" >> security-summary.md
+          echo "" >> security-summary.md
+          if [ "${{ needs.python-security-scan.result }}" == "success" ]; then
+            echo "✅ **Python Security Scan:** Passed" >> security-summary.md
+          else
+            echo "❌ **Python Security Scan:** Failed" >> security-summary.md
+          fi
+          if [ "${{ needs.docker-security-scan.result }}" == "success" ]; then
+            echo "✅ **Docker Security Scan:** Passed" >> security-summary.md
+          else
+            echo "❌ **Docker Security Scan:** Failed" >> security-summary.md
+          fi
+          echo "" >> security-summary.md
+          echo "## Artifacts" >> security-summary.md
+          echo "" >> security-summary.md
+          echo "- Python Security Reports: \`python-security-reports-${{ github.run_id }}\`" >> security-summary.md
+          echo "  - Bandit static analysis: \`bandit-report.json\`" >> security-summary.md
+          echo "  - pip-audit dependency scan: \`pip-audit-report.json\`" >> security-summary.md
+          echo "- Docker Security Reports: \`docker-security-reports-*-${{ github.run_id }}\`" >> security-summary.md
+          echo "  - SARIF format: \`trivy-results-*.sarif\`" >> security-summary.md
+          echo "  - JSON format: \`trivy-report-*.json\`" >> security-summary.md
+          echo "  - Table format: \`trivy-table-*.txt\`" >> security-summary.md
+          echo "" >> security-summary.md
+
+          # Include Docker vulnerability summary in comprehensive report
+          if [ -f "docker-vuln-summary.md" ]; then
+            cat docker-vuln-summary.md >> security-summary.md
+          fi
+
+      - name: Upload security summary
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: security-summary-${{ github.run_id }}
+          path: |
+            security-summary.md
+            docker-vuln-summary.md
+          retention-days: 90
+
+      - name: Comment on commit (if triggered by CD)
+        if: github.event_name == 'workflow_run' && needs.check-cd-status.outputs.should-scan == 'true'
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pythonStatus = '${{ needs.python-security-scan.result }}' === 'success' ? '✅' : '❌';
+            const dockerStatus = '${{ needs.docker-security-scan.result }}' === 'success' ? '✅' : '❌';
+
+            const body = `🔒 **Security Scan Completed**
+
+            ${pythonStatus} Python Code Security
+            ${dockerStatus} Docker Image Security
+
+            📊 [View detailed results](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
+
+            await github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: '${{ github.event.workflow_run.head_sha || github.sha }}',
+              body: body
+            });
