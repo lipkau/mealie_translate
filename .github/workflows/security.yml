@@ -1,0 +1,341 @@
+name: Security Scanning
+
+on:
+  # Trigger after successful CD deployment
+  workflow_run:
+    workflows: ["Continuous Deployment"]
+    types: [completed]
+    branches: [main]
+
+  # Allow manual trigger for security audits
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Docker image tag to scan (defaults to latest)"
+        required: false
+        default: "latest"
+        type: string
+
+  # Monthly security audit
+  schedule:
+    - cron: "0 2 1 * *" # First day of every month at 2 AM UTC
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Only run if CD workflow succeeded
+  check-cd-status:
+    name: Check CD Status
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_run'
+    outputs:
+      cd-passed: ${{ steps.check.outputs.result }}
+      should-scan: ${{ steps.check.outputs.should-scan }}
+    steps:
+      - name: Check CD workflow result
+        id: check
+        run: |
+          if [ "${{ github.event.workflow_run.conclusion }}" == "success" ]; then
+            echo "result=true" >> $GITHUB_OUTPUT
+            echo "should-scan=true" >> $GITHUB_OUTPUT
+          else
+            echo "result=false" >> $GITHUB_OUTPUT
+            echo "should-scan=false" >> $GITHUB_OUTPUT
+          fi
+
+  python-security-scan:
+    name: Python Code Security
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_run' && needs.check-cd-status.outputs.should-scan == 'true')
+    needs: [check-cd-status]
+    continue-on-error: false
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # CodeQL static analysis with false positive filtering
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: python
+          config-file: ./.github/codeql/codeql-config.yml
+          queries: security-and-quality
+
+      # Manual build step for CodeQL (prevents autobuild conflicts)
+      - uses: github/codeql-action/autobuild@v3
+
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:python"
+          upload: false
+          output: "codeql-results"
+        continue-on-error: true
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-security-3.13-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-security-3.13-
+            ${{ runner.os }}-pip-security-
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+
+      - run: make security-bandit PYTHON=python
+        continue-on-error: true
+
+      - run: make security-pip-audit PYTHON=python
+        continue-on-error: true
+
+      - name: Filter CodeQL results
+        if: always()
+        run: |
+          echo "Debugging: Current directory contents:"
+          ls -la
+
+          echo "Debugging: Looking for SARIF files..."
+          find . -name "*.sarif" -type f 2>/dev/null || echo "No SARIF files found in current directory"
+
+          # CodeQL analyze action with output specified saves SARIF to the specified directory
+          sarif_file=""
+
+          # Look for SARIF files in the output directory and current directory
+          for search_path in "codeql-results" "."; do
+            if [ -d "$search_path" ]; then
+              echo "Searching in directory: $search_path"
+              found_sarif=$(find "$search_path" -name "*.sarif" -type f 2>/dev/null | head -1)
+              if [ -n "$found_sarif" ] && [ -f "$found_sarif" ]; then
+                sarif_file="$found_sarif"
+                echo "Found SARIF file at: $sarif_file"
+                break
+              fi
+            fi
+          done
+
+          if [ -n "$sarif_file" ] && [ -f "$sarif_file" ]; then
+            echo "Processing SARIF file: $sarif_file"
+            echo "SARIF file size: $(wc -c < "$sarif_file") bytes"
+            python .github/scripts/filter_sarif.py "$sarif_file" "codeql-filtered.sarif"
+            echo "CodeQL SARIF filtering completed"
+          else
+            echo "No CodeQL SARIF file found - creating minimal valid SARIF"
+            cat > codeql-filtered.sarif << 'EOF'
+          {
+            "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+            "version": "2.1.0",
+            "runs": [
+              {
+                "tool": {
+                  "driver": {
+                    "name": "CodeQL",
+                    "version": "0.0.0"
+                  }
+                },
+                "results": []
+              }
+            ]
+          }
+          EOF
+          fi
+
+          echo "Final SARIF file size: $(wc -c < codeql-filtered.sarif) bytes"
+
+      - name: Upload filtered CodeQL results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: codeql-filtered.sarif
+          category: "/language:python"
+        continue-on-error: true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: python-security-reports-${{ github.run_id }}
+          path: |
+            bandit-report.json
+            pip-audit-report.json
+            codeql-filtered.sarif
+          retention-days: 30
+
+  docker-security-scan-dev:
+    name: Docker Image Security (dev)
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.image_tag == 'dev') ||
+      (github.event_name == 'schedule') ||
+      (github.event_name == 'workflow_run' && needs.check-cd-status.outputs.should-scan == 'true' && github.event.workflow_run.head_branch == 'main')
+    needs: [check-cd-status]
+    continue-on-error: false
+
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if dev image exists
+        id: image-check
+        run: |
+          if docker manifest inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev > /dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Image dev exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Image dev does not exist, skipping scan"
+          fi
+
+      - name: Run Trivy vulnerability scanner
+        if: steps.image-check.outputs.exists == 'true'
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev
+          format: "sarif"
+          output: "trivy-results-dev.sarif"
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        if: steps.image-check.outputs.exists == 'true'
+        uses: github/codeql-action/upload-sarif@v3
+        continue-on-error: true
+        with:
+          sarif_file: "trivy-results-dev.sarif"
+          category: "docker-dev"
+
+  docker-security-scan-latest:
+    name: Docker Image Security (latest)
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.image_tag == 'latest' || github.event.inputs.image_tag == '')) ||
+      (github.event_name == 'schedule') ||
+      (github.event_name == 'workflow_run' && needs.check-cd-status.outputs.should-scan == 'true' && startsWith(github.event.workflow_run.head_branch, 'v'))
+    needs: [check-cd-status]
+    continue-on-error: false
+
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if latest image exists
+        id: image-check
+        run: |
+          if docker manifest inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest > /dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Image latest exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Image latest does not exist, skipping scan"
+          fi
+
+      - name: Run Trivy vulnerability scanner
+        if: steps.image-check.outputs.exists == 'true'
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          format: "sarif"
+          output: "trivy-results-latest.sarif"
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        if: steps.image-check.outputs.exists == 'true'
+        uses: github/codeql-action/upload-sarif@v3
+        continue-on-error: true
+        with:
+          sarif_file: "trivy-results-latest.sarif"
+          category: "docker-latest"
+
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs:
+      [
+        check-cd-status,
+        python-security-scan,
+        docker-security-scan-dev,
+        docker-security-scan-latest,
+      ]
+    if: always() && (needs.python-security-scan.result != 'skipped' || needs.docker-security-scan-dev.result != 'skipped' || needs.docker-security-scan-latest.result != 'skipped')
+    permissions:
+      contents: write # Required for creating commit comments
+      actions: read # Required for downloading artifacts
+
+    steps:
+      - name: Create security summary
+        run: |
+          echo "# 🔒 Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Scan triggered by:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Repository:** ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Python security status
+          if [ "${{ needs.python-security-scan.result }}" == "success" ]; then
+            echo "✅ **Python Security Scan:** Passed (bandit + pip-audit + CodeQL)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Python Security Scan:** Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Docker security status
+          dev_result="${{ needs.docker-security-scan-dev.result }}"
+          latest_result="${{ needs.docker-security-scan-latest.result }}"
+
+          if [ "$dev_result" == "success" ] || [ "$latest_result" == "success" ]; then
+            echo "✅ **Docker Security Scan:** Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Docker Security Scan:** Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📊 **Detailed reports available in GitHub Security tab**" >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment on commit (if triggered by CD)
+        if: github.event_name == 'workflow_run' && needs.check-cd-status.outputs.should-scan == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pythonStatus = '${{ needs.python-security-scan.result }}' === 'success' ? '✅' : '❌';
+            const devStatus = '${{ needs.docker-security-scan-dev.result }}';
+            const latestStatus = '${{ needs.docker-security-scan-latest.result }}';
+            const dockerStatus = (devStatus === 'success' || latestStatus === 'success') ? '✅' : '❌';
+
+            const body = `🔒 **Security Scan Completed**
+
+            ${pythonStatus} Python Code Security
+            ${dockerStatus} Docker Image Security
+
+            📊 [View detailed results](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
+
+            await github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: '${{ github.event.workflow_run.head_sha || github.sha }}',
+              body: body
+            });

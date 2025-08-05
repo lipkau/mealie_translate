@@ -1,0 +1,122 @@
+name: Bug Report
+description: Report a bug or issue with the Mealie Recipe Translator
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report! Please provide as much detail as possible to help us diagnose and fix the issue.
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Pre-flight checklist
+      description: Please confirm you have completed the following
+      options:
+        - label: I have searched existing issues to ensure this bug hasn't been reported before
+          required: true
+        - label: I have checked the documentation for potential solutions
+          required: true
+        - label: I am using a supported Python version (3.11+)
+          required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: What version of Mealie Recipe Translator are you using?
+      placeholder: "e.g., v1.2.3 or commit SHA"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      description: How are you running the application?
+      options:
+        - Local Python installation
+        - Docker container
+        - Development environment
+        - Other (please specify in description)
+    validations:
+      required: true
+
+  - type: textarea
+    id: bug-description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is
+      placeholder: Describe what you expected to happen vs what actually happened
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction-steps
+    attributes:
+      label: Steps to Reproduce
+      description: Please provide step-by-step instructions to reproduce the issue
+      placeholder: |
+        1. Go to '...'
+        2. Click on '....'
+        3. Scroll down to '....'
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: A clear and concise description of what you expected to happen
+    validations:
+      required: true
+
+  - type: textarea
+    id: error-logs
+    attributes:
+      label: Error Logs
+      description: Please paste any relevant error messages or stack traces
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: configuration
+    attributes:
+      label: Configuration
+      description: |
+        Please share relevant parts of your configuration (remove sensitive information like API keys)
+      placeholder: |
+        ```
+        # Your .env settings (redacted)
+        OPENAI_MODEL=gpt-4o-mini
+        TARGET_LANGUAGE=spanish
+        # etc.
+        ```
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: system-info
+    attributes:
+      label: System Information
+      description: |
+        Please provide information about your system
+      placeholder: |
+        - OS: [e.g., Ubuntu 22.04, Windows 11, macOS 14]
+        - Python version: [e.g., 3.13.0]
+        - Docker version (if applicable): [e.g., 24.0.7]
+        - Mealie version: [e.g., v1.9.0]
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Add any other context about the problem here, including screenshots if applicable
+    validations:
+      required: false

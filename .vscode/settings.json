@@ -1,0 +1,24 @@
+{
+  "python.defaultInterpreterPath": "./.venv/bin/python",
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit",
+      "source.organizeImports.ruff": "explicit"
+    },
+    "editor.rulers": [88],
+    "editor.wordWrapColumn": 88
+  },
+  "ruff.lineLength": 88,
+  "ruff.enable": true,
+  "python.languageServer": "Pylance",
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/.pytest_cache": true,
+    "**/.ruff_cache": true,
+    "**/htmlcov": true,
+    "**/*.egg-info": true
+  },
+  "flake8.enabled": false
+}

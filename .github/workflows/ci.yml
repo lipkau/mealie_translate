@@ -1,0 +1,192 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  markdownlint:
+    name: Markdown Linting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm clean-install
+
+      - run: make lint-markdown
+
+  code-quality-and-coverage:
+    name: Code Quality & Test Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-3.13-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-3.13-
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+
+      - run: make lint-no-markdown PYTHON=python
+
+      - name: Run unit tests with coverage
+        run: |
+          python -m pytest tests/ -v -m "not integration" --cov=mealie_translate --cov-report=xml --cov-report=term --cov-report=html --junit-xml=pytest-results.xml
+
+      - uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+      - name: Publish Test Results
+        uses: dorny/test-reporter@v2
+        if: always()
+        with:
+          name: Test Results (Coverage)
+          path: pytest-results.xml
+          reporter: java-junit
+          fail-on-error: false
+
+      - name: Upload test and coverage artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-coverage
+          path: |
+            pytest-results.xml
+            coverage.xml
+            htmlcov/
+          retention-days: 14
+
+  test:
+    name: Test Matrix
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ matrix.python-version }}-
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+
+      - name: Run unit tests (without coverage)
+        run: |
+          python -m pytest tests/ -v -m "not integration" --junit-xml=pytest-results.xml
+
+      - name: Publish Test Results
+        uses: dorny/test-reporter@v2
+        if: always()
+        with:
+          name: Test Results (Python ${{ matrix.python-version }})
+          path: pytest-results.xml
+          reporter: java-junit
+          fail-on-error: false
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-python-${{ matrix.python-version }}
+          path: pytest-results.xml
+          retention-days: 14
+
+  docker-test:
+    name: Docker Build Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and test Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: testing
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'run-integration-tests')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-3.13-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-3.13-
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+
+      - run: |
+          make test-integration PYTHON=python
+
+      - name: Publish Integration Test Results
+        uses: dorny/test-reporter@v2
+        if: always()
+        with:
+          name: Integration Test Results
+          path: pytest-results-integration.xml
+          reporter: java-junit
+          fail-on-error: false
+
+      - name: Upload integration test artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-test-results
+          path: |
+            pytest-results-integration.xml
+            test-logs/
+          retention-days: 14

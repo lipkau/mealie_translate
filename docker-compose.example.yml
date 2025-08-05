@@ -1,0 +1,28 @@
+services:
+  mealie-translator:
+    image: ghcr.io/lipkau/mealie_translate:latest
+    environment:
+      # Required: Your Mealie server details
+      - MEALIE_BASE_URL=https://your-mealie-instance.com
+      - MEALIE_API_TOKEN=your-mealie-api-token
+
+      # Required: OpenAI API key for translation
+      - OPENAI_API_KEY=your-openai-api-key
+
+      # Optional: Cron schedule (default: every 6 hours)
+      - CRON_SCHEDULE=0 */6 * * *
+
+      # Optional: OpenAI model (default: gpt-4o-mini)
+      # - OPENAI_MODEL=gpt-4o-mini
+
+      # Optional: Target language (default: German)
+      # - TARGET_LANGUAGE=German
+
+      # Optional: Logging level (default: INFO)
+      # - LOG_LEVEL=INFO
+
+    restart: unless-stopped
+
+    # Optional: Mount logs directory for persistent logging
+    # volumes:
+    #   - ./logs:/var/log

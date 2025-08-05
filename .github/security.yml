@@ -1,0 +1,24 @@
+# Security Policy Configuration
+#
+# This file configures GitHub's automatic security features.
+# By having a custom CodeQL workflow, we disable the default analysis
+# that often produces many false positives.
+
+# Disable default CodeQL analysis since we have a custom workflow
+# with better filtering and configuration
+default_setup_languages: []
+# Our repository uses the following security scanning:
+# - Custom CodeQL workflow with false positive filtering
+# - Bandit static analysis for Python security issues
+# - pip-audit for dependency vulnerability scanning
+# - Trivy for Docker image security scanning
+# - Dependabot for automated dependency updates
+
+# To view security findings:
+# - Go to the Security tab in the GitHub repository
+# - Check the "Code scanning alerts" section
+# - Review workflow artifacts for detailed reports
+
+# To report security vulnerabilities:
+# - Use the "Report a vulnerability" button in the Security tab
+# - Follow the guidelines in SECURITY.md

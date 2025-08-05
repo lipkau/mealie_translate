@@ -1,0 +1,48 @@
+{
+  "include": ["mealie_translate", "tests", "main.py"],
+  "exclude": [
+    "**/__pycache__",
+    "**/.venv",
+    "**/node_modules",
+    "**/.git",
+    "htmlcov",
+    "mealie_recipe_translator.egg-info"
+  ],
+  "pythonVersion": "3.11",
+  "pythonPlatform": "All",
+  "venvPath": ".",
+  "venv": ".venv",
+  "stubPath": "./typings",
+  "executionEnvironments": [
+    {
+      "root": ".",
+      "pythonVersion": "3.11",
+      "pythonPlatform": "All",
+      "extraPaths": [],
+      "venv": ".venv"
+    }
+  ],
+  "reportMissingImports": true,
+  "reportMissingTypeStubs": false,
+  "reportImportCycles": false,
+  "reportUnusedImport": true,
+  "reportUnusedClass": false,
+  "reportUnusedFunction": false,
+  "reportUnusedVariable": true,
+  "reportDuplicateImport": true,
+  "reportOptionalSubscript": true,
+  "reportOptionalMemberAccess": true,
+  "reportOptionalCall": true,
+  "reportOptionalIterable": true,
+  "reportOptionalContextManager": true,
+  "reportOptionalOperand": true,
+  "reportTypedDictNotRequiredAccess": false,
+  "reportPrivateImportUsage": false,
+  "reportConstantRedefinition": true,
+  "reportIncompatibleMethodOverride": true,
+  "reportIncompatibleVariableOverride": true,
+  "reportOverlappingOverloads": true,
+  "strict": [],
+  "typeCheckingMode": "basic",
+  "_comment": "Note: Line length is configured in pyproject.toml (88 chars) and enforced by Ruff formatter, not Pyright"
+}

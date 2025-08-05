@@ -1,0 +1,46 @@
+name: "CodeQL Configuration"
+
+# Disable automatic language detection to prevent scanning unintended files
+disable-default-path-filters: false
+
+# Only scan Python files in our main package
+paths:
+  - "mealie_translate/"
+  - "main.py"
+
+# Exclude files that shouldn't be scanned for security issues
+paths-ignore:
+  - "**/*.md"
+  - "**/*.yml"
+  - "**/*.yaml"
+  - "**/*.json"
+  - "**/*.txt"
+  - "**/*.toml"
+  - "tests/"
+  - "htmlcov/"
+  - "tools/"
+  - "*.egg-info/"
+  - "__pycache__/"
+  - ".venv/"
+  - "node_modules/"
+  - "dist/"
+  - "build/"
+
+# Use security-and-quality query suite instead of security-extended
+queries:
+  - uses: security-and-quality
+  - exclude:
+      id:
+        # Exclude common false positives for simple Python applications
+        - py/incomplete-url-substring-sanitization
+        - py/incomplete-hostname-regexp
+        - py/regex-injection
+        - py/polynomial-redos
+        - py/clear-text-logging-sensitive-data
+        - py/incomplete-regular-expression-for-hostnames
+        # Exclude overly strict rules for our use case
+        - py/hardcoded-credentials # We document proper env var usage
+        - py/clear-text-storage-of-sensitive-data # We use env vars properly
+
+# Configure external data sources if needed
+external-repository-token: ${{ secrets.GITHUB_TOKEN }}

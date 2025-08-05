@@ -1,0 +1,57 @@
+services:
+  mealie-translator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: mealie-translator
+    environment:
+      # Environment variables (override with .env file)
+      MEALIE_BASE_URL: ${MEALIE_BASE_URL}
+      MEALIE_API_TOKEN: ${MEALIE_API_TOKEN}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      TARGET_LANGUAGE: ${TARGET_LANGUAGE:-German}
+      BATCH_SIZE: ${BATCH_SIZE:-5}
+      DRY_RUN: ${DRY_RUN:-false}
+      CRON_SCHEDULE: ${CRON_SCHEDULE:-0 */6 * * *}
+    env_file:
+      - .env
+    restart: unless-stopped
+    volumes:
+      # Mount for logs
+      - translator-logs:/var/log
+
+  # Development version with volume mounts
+  mealie-translator-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: mealie-translator-dev
+    environment:
+      MEALIE_BASE_URL: ${MEALIE_BASE_URL}
+      MEALIE_API_TOKEN: ${MEALIE_API_TOKEN}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      TARGET_LANGUAGE: ${TARGET_LANGUAGE:-German}
+      BATCH_SIZE: ${BATCH_SIZE:-5}
+      DRY_RUN: ${DRY_RUN:-true}
+      CRON_SCHEDULE: ${CRON_SCHEDULE:-*/30 * * * *}
+    env_file:
+      - .env
+    volumes:
+      # Mount source code for development
+      - .:/app
+      # Persist Python packages
+      - dev-packages:/home/app/.local
+      # Mount for logs
+      - translator-logs:/var/log
+    working_dir: /app
+    command: python main.py
+    profiles:
+      - dev
+
+volumes:
+  dev-packages:
+  translator-logs:
