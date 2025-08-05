@@ -1,0 +1,116 @@
+name: Documentation Issue
+description: Report an issue with documentation or suggest documentation improvements
+title: "[Docs]: "
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve our documentation! Clear and accurate docs are essential for a great user experience.
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Pre-flight checklist
+      description: Please confirm you have completed the following
+      options:
+        - label: I have searched existing issues to ensure this hasn't been reported before
+          required: true
+        - label: I have checked multiple documentation sources (README, docs folder, inline comments)
+          required: true
+
+  - type: dropdown
+    id: doc-type
+    attributes:
+      label: Documentation Type
+      description: What type of documentation issue is this?
+      options:
+        - README.md
+        - Installation instructions
+        - Configuration guide
+        - API documentation
+        - Docker documentation
+        - Development setup
+        - Code comments
+        - Examples/tutorials
+        - Troubleshooting guide
+        - Other (please specify)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: issue-type
+    attributes:
+      label: Issue Type
+      description: What kind of documentation issue is this?
+      options:
+        - Incorrect information
+        - Missing information
+        - Unclear/confusing explanation
+        - Outdated content
+        - Broken links
+        - Formatting issues
+        - Missing examples
+        - Translation/language issues
+        - Accessibility issues
+        - Other (please specify)
+    validations:
+      required: true
+
+  - type: input
+    id: location
+    attributes:
+      label: Location
+      description: Which file(s) or section(s) are affected?
+      placeholder: "e.g., README.md line 45, docs/DOCKER.md, mealie_translate/config.py docstring"
+    validations:
+      required: true
+
+  - type: textarea
+    id: current-content
+    attributes:
+      label: Current Content
+      description: What does the current documentation say? (copy/paste the problematic content)
+      render: markdown
+    validations:
+      required: false
+
+  - type: textarea
+    id: issue-description
+    attributes:
+      label: Issue Description
+      description: Describe the problem with the current documentation
+      placeholder: "The current documentation is confusing because..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggested-improvement
+    attributes:
+      label: Suggested Improvement
+      description: How should this be improved? Please provide specific suggestions.
+      placeholder: "This should be changed to..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: |
+        Add any other context about the documentation issue here.
+        - Screenshots of confusing sections
+        - Links to related documentation
+        - Examples of good documentation for similar features
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Are you interested in helping improve this documentation?
+      options:
+        - label: I would be willing to submit a pull request to fix this
+        - label: I would be willing to review proposed changes
+        - label: I would be willing to test updated documentation

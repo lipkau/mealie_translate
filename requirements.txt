@@ -1,0 +1,4 @@
+# This file is kept for compatibility but dependencies are managed in pyproject.toml
+# Install with: pip install -e . or pip install -e .[dev]
+# Or use: make setup for complete development environment
+# Don't forget to configure .env file: make setup-env

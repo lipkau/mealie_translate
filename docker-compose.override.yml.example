@@ -1,0 +1,37 @@
+# docker-compose.override.yml.example
+# Copy this file to docker-compose.override.yml and customize as needed
+# This file allows you to override settings without modifying the main docker-compose.yml
+
+services:
+  mealie-translator:
+    environment:
+      # Override cron schedule for production
+      # Examples:
+      # Daily at 2 AM:     CRON_SCHEDULE: "0 2 * * *"
+      # Every 4 hours:     CRON_SCHEDULE: "0 */4 * * *"
+      # Twice daily:       CRON_SCHEDULE: "0 6,18 * * *"
+      # Every 30 minutes:  CRON_SCHEDULE: "*/30 * * * *"
+      CRON_SCHEDULE: "0 */6 * * *"
+
+      # Override other settings
+      # BATCH_SIZE: 20
+      # TARGET_LANGUAGE: "Spanish"
+      # DRY_RUN: false
+
+  mealie-translator-dev:
+    volumes:
+      # Mount source code for live reloading
+      - .:/app
+      # Persist pip cache
+      - pip-cache:/home/app/.cache/pip
+    environment:
+      # More frequent runs for development/testing
+      CRON_SCHEDULE: "*/15 * * * *"
+      DRY_RUN: "true"
+      LOG_LEVEL: "DEBUG"
+    ports:
+      # Expose port if you add a web interface later
+      - "8000:8000"
+
+volumes:
+  pip-cache:

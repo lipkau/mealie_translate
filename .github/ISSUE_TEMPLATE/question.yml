@@ -1,0 +1,136 @@
+name: Question/Support
+description: Ask a question about using the Mealie Recipe Translator
+title: "[Question]: "
+labels: ["question", "help wanted"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Need help with the Mealie Recipe Translator? We're here to help!
+
+        Before asking, please check:
+        - [README.md](../../README.md) for basic usage
+        - [Documentation folder](../../docs/) for detailed guides
+        - [Existing discussions](../../discussions) for similar questions
+        - [Closed issues](../../issues?q=is%3Aissue+is%3Aclosed) for previous solutions
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-question checklist
+      description: Please confirm you have checked the following
+      options:
+        - label: I have searched existing issues and discussions
+          required: true
+        - label: I have read the relevant documentation
+          required: true
+        - label: I have checked the troubleshooting guide
+          required: true
+
+  - type: dropdown
+    id: question-category
+    attributes:
+      label: Question Category
+      description: What area is your question about?
+      options:
+        - Installation and setup
+        - Configuration
+        - Mealie API integration
+        - OpenAI API integration
+        - Translation behavior
+        - Docker usage
+        - Recipe processing
+        - Error troubleshooting
+        - Performance optimization
+        - Development and contributing
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: Please describe your question clearly and provide context
+      placeholder: "I'm trying to... but I'm having trouble with..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-tried
+    attributes:
+      label: What Have You Tried?
+      description: What steps have you already attempted?
+      placeholder: |
+        - I tried following the README instructions...
+        - I searched for similar issues...
+        - I checked the logs and saw...
+    validations:
+      required: false
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+    validations:
+      required: false
+
+  - type: textarea
+    id: current-behavior
+    attributes:
+      label: Current Behavior
+      description: What is actually happening?
+    validations:
+      required: false
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment Details
+      description: Please provide relevant environment information
+      value: |
+        - OS:
+        - Python version:
+        - Installation method: (pip, Docker, source)
+        - Mealie version:
+        - Config file settings:
+      render: markdown
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs/Output
+      description: Include any error messages, log output, or console output
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: |
+        Add any other context that might help us understand your question:
+        - Screenshots
+        - Configuration files (with sensitive data removed)
+        - Example recipes
+        - Network setup details
+    validations:
+      required: false
+
+  - type: dropdown
+    id: urgency
+    attributes:
+      label: Urgency Level
+      description: How urgent is this question for you?
+      options:
+        - Low - I can work around this
+        - Medium - It's blocking some functionality
+        - High - It's preventing me from using the tool
+        - Critical - Production issue
+      default: 0
+    validations:
+      required: false

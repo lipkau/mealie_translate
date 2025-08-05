@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Discussions
+    url: https://github.com/LIO2MU/mealie_translate/discussions
+    about: Ask questions, share ideas, and discuss with the community
+  - name: 📖 Documentation
+    url: https://github.com/LIO2MU/mealie_translate/blob/main/README.md
+    about: Check our documentation for installation and usage guides
+  - name: 🐛 Mealie Issues
+    url: https://github.com/mealie-recipes/mealie/issues
+    about: Report issues with Mealie itself (not this translator)
+  - name: 🤖 OpenAI Support
+    url: https://help.openai.com/
+    about: Get help with OpenAI API issues

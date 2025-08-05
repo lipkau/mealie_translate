@@ -1,0 +1,66 @@
+name: Dependabot Auto-merge
+
+# Automatically enables auto-merge for safe Dependabot updates (patch + minor)
+# Note: Manual approval is still required due to GitHub security restrictions
+# This workflow only enables auto-merge; approvals must be done manually
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  dependabot:
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+    steps:
+      - name: Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Enable auto-merge for patch and minor updates
+        if: steps.metadata.outputs.update-type == 'version-update:semver-patch' || steps.metadata.outputs.update-type == 'version-update:semver-minor'
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{github.event.pull_request.html_url}}
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
+      - name: Enable auto-merge for Docker patch and minor updates
+        if: steps.metadata.outputs.package-ecosystem == 'docker' && (steps.metadata.outputs.update-type == 'version-update:semver-patch' || steps.metadata.outputs.update-type == 'version-update:semver-minor')
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{github.event.pull_request.html_url}}
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
+      - name: Enable auto-merge for GitHub Actions updates
+        if: steps.metadata.outputs.package-ecosystem == 'github_actions'
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{github.event.pull_request.html_url}}
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
+      - name: Comment on auto-merged PR
+        if: steps.metadata.outputs.update-type == 'version-update:semver-patch' || steps.metadata.outputs.update-type == 'version-update:semver-minor' || steps.metadata.outputs.package-ecosystem == 'github_actions'
+        run: |
+          gh pr comment "$PR_URL" --body "🤖 **Auto-merge enabled**
+
+          This ${{ steps.metadata.outputs.update-type }} update will be automatically merged after:
+          1. All CI checks pass ✅
+          2. Manual approval from a maintainer 👍
+
+          **Package**: ${{ steps.metadata.outputs.dependency-names }}
+          **Ecosystem**: ${{ steps.metadata.outputs.package-ecosystem }}
+          **Update type**: ${{ steps.metadata.outputs.update-type }}
+
+          If you need to review this manually, you can disable auto-merge with:
+          \`gh pr merge --disable-auto $PR_URL\`
+
+          To approve: \`gh pr review --approve $PR_URL\`"
+        env:
+          PR_URL: ${{github.event.pull_request.html_url}}
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}

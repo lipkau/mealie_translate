@@ -1,0 +1,10 @@
+# Trivy ignore file for Docker image scanning
+# This file specifies vulnerabilities that should be ignored during container scanning
+
+# Note: We use pip-audit for Python dependency scanning, not Trivy filesystem scanning
+# This file only affects Docker image vulnerability scanning
+
+# Ignore these directories in container scans (if applicable)
+.git/
+__pycache__/
+.pytest_cache/
