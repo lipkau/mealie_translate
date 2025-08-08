@@ -60,12 +60,12 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python 3.13
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.13"
 
       - name: Cache pip dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-security-${{ hashFiles('pyproject.toml') }}
@@ -89,7 +89,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload Python security reports
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: python-security-reports-${{ github.run_id }}
@@ -131,7 +131,7 @@ jobs:
           output: "trivy-results-${{ steps.image.outputs.tag }}.sarif"
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: "trivy-results-${{ steps.image.outputs.tag }}.sarif"
           category: "docker-${{ steps.image.outputs.tag }}"
@@ -159,7 +159,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload Docker security reports
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: docker-security-reports-${{ steps.image.outputs.tag }}-${{ github.run_id }}
@@ -177,7 +177,7 @@ jobs:
 
     steps:
       - name: Download all security reports
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v5
 
       - name: Analyze Docker vulnerabilities
         run: |
@@ -285,7 +285,7 @@ jobs:
           fi
 
       - name: Upload security summary
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: security-summary-${{ github.run_id }}
@@ -296,7 +296,7 @@ jobs:
 
       - name: Comment on commit (if triggered by CD)
         if: github.event_name == 'workflow_run' && needs.check-cd-status.outputs.should-scan == 'true'
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |

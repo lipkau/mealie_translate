@@ -37,12 +37,12 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Cache pip dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('pyproject.toml') }}
@@ -68,7 +68,7 @@ jobs:
           python -m pytest tests/ -v -m "not integration" --cov=mealie_translate --cov-report=xml --cov-report=term --cov-report=html --junit-xml=pytest-results.xml
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         with:
           file: ./coverage.xml
           flags: unittests
@@ -76,7 +76,7 @@ jobs:
           fail_ci_if_error: false
 
       - name: Publish Test Results
-        uses: dorny/test-reporter@v1
+        uses: dorny/test-reporter@v2
         if: always()
         with:
           name: Test Results (Python ${{ matrix.python-version }})
@@ -85,7 +85,7 @@ jobs:
           fail-on-error: false
 
       - name: Upload test and coverage artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-results-python-${{ matrix.python-version }}
@@ -108,7 +108,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build and test Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           target: testing
@@ -127,7 +127,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python 3.13
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.13"
 
@@ -145,7 +145,7 @@ jobs:
           CI: true
 
       - name: Publish Integration Test Results
-        uses: dorny/test-reporter@v1
+        uses: dorny/test-reporter@v2
         if: always()
         with:
           name: Integration Test Results
@@ -154,7 +154,7 @@ jobs:
           fail-on-error: false
 
       - name: Upload integration test artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: integration-test-results
