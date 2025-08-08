@@ -1,5 +1,5 @@
 # Stage 1: Base image with Python requirements
-FROM python:3.13.0-slim AS base
+FROM python:3.13.6-slim AS base
 
 # Add image labels for metadata
 LABEL org.opencontainers.image.title="Mealie Recipe Translator"
