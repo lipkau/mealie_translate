@@ -131,22 +131,26 @@ The Continuous Deployment workflow requires specific GitHub permissions to funct
 
 ```yaml
 permissions:
-  contents: read      # Access repository code
-  packages: write     # Push to GitHub Container Registry (GHCR)
+  contents: read # Access repository code
+  packages: write # Push to GitHub Container Registry (GHCR)
 ```
 
 #### `security-scan` job
 
 ```yaml
 permissions:
-  contents: read          # Access repository code
-  security-events: write  # Upload security scan results to GitHub Security tab
+  contents: read # Access repository code
+  security-events: write # Upload security scan results to GitHub Security tab
+  actions: read # Required for CodeQL integration
 ```
 
 ### Common Permission Issues
 
 - **"installation not allowed to Create organization package"**: Missing `packages: write` permission
-- **"Resource not accessible by integration"**: Missing `security-events: write` for SARIF uploads
+- **"Resource not accessible by integration"**: Missing `security-events: write` for SARIF uploads, or missing repository
+  checkout
+- **"The checkout path provided to the action does not appear to be a git repository"**: Missing `actions/checkout`
+  step in security-scan job
 - **403 Forbidden errors**: Insufficient token permissions for registry operations
 
 ### Best Practices

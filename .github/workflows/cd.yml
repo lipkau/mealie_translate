@@ -119,9 +119,15 @@ jobs:
     permissions:
       contents: read
       security-events: write
-
+      actions: read
     steps:
-      - uses: aquasecurity/trivy-action@master
+      - uses: actions/checkout@v4
+        with:
+          # For workflow_run events, checkout the commit that triggered the original workflow
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           format: "sarif"
@@ -129,6 +135,7 @@ jobs:
 
       - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
+        if: always()
         with:
           sarif_file: "trivy-results.sarif"
 
