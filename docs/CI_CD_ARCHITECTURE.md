@@ -121,6 +121,41 @@ Integration tests run conditionally:
 - **Protection Rules**: Required reviewers, deployment windows
 - **Purpose**: Live application deployment
 
+## GitHub Permissions
+
+### CD Workflow Permissions
+
+The Continuous Deployment workflow requires specific GitHub permissions to function properly:
+
+#### `docker-build-and-push` job
+
+```yaml
+permissions:
+  contents: read      # Access repository code
+  packages: write     # Push to GitHub Container Registry (GHCR)
+```
+
+#### `security-scan` job
+
+```yaml
+permissions:
+  contents: read          # Access repository code
+  security-events: write  # Upload security scan results to GitHub Security tab
+```
+
+### Common Permission Issues
+
+- **"installation not allowed to Create organization package"**: Missing `packages: write` permission
+- **"Resource not accessible by integration"**: Missing `security-events: write` for SARIF uploads
+- **403 Forbidden errors**: Insufficient token permissions for registry operations
+
+### Best Practices
+
+- Use minimal required permissions for each job
+- CI workflows typically only need `contents: read`
+- CD workflows need elevated permissions for deployments
+- Security scanning requires `security-events: write` for integration with GitHub Security
+
 ## Migration from Monolithic Pipeline
 
 The old `ci-cd.yml` has been preserved as `ci-cd.yml.bak` for reference.
