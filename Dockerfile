@@ -47,6 +47,7 @@ COPY --chown=app:app mealie_translate/ ./mealie_translate/
 
 # Switch to app user
 USER app
+ENV PATH=$PATH:/home/app/.local/bin
 
 # Install development dependencies (now source code is available for editable install)
 RUN pip install -e .[dev]

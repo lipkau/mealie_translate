@@ -104,6 +104,7 @@ Use the make lint-all command to check code quality.
 2. **Follow existing patterns**: Look at existing code for structure
 3. **Add tests**: Unit tests in `tests/`, follow existing patterns
 4. **Update docs**: If changing behavior, update relevant documentation
+5. **Test your changes**: Run all tests locally before pushing
 
 ### When Writing Documentation
 

@@ -1,57 +1,24 @@
 name: Continuous Deployment
 
 on:
-  push:
-    branches: [main]
-    tags: ["v*"]
   workflow_run:
     workflows: ["Continuous Integration"]
     types: [completed]
-    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  # Only run deployment if CI passed
-  check-ci-status:
-    name: Check CI Status
+  dev-image:
+    name: Retag and Push Dev Image
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_run'
-    outputs:
-      ci-passed: ${{ steps.check.outputs.result }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && !startsWith(github.event.workflow_run.head_sha, 'refs/tags/v') }}
     steps:
-      - name: Check CI workflow result
-        id: check
-        run: |
-          if [ "${{ github.event.workflow_run.conclusion }}" == "success" ]; then
-            echo "result=true" >> $GITHUB_OUTPUT
-          else
-            echo "result=false" >> $GITHUB_OUTPUT
-            exit 1
-          fi
-
-  docker-build-and-push:
-    name: Build and Push Docker Images
-    runs-on: ubuntu-latest
-    # Run on direct push to main, tags, or after successful CI workflow
-    if: |
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_run' && needs.check-ci-status.outputs.ci-passed == 'true')
-    needs: [check-ci-status]
-    # Allow needs to be skipped for direct push events
-    continue-on-error: false
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          # For workflow_run events, checkout the commit that triggered the original workflow
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-
       - uses: docker/setup-buildx-action@v3
 
       - uses: docker/login-action@v3
@@ -60,35 +27,57 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/metadata-action@v5
-        id: meta
+      - name: Pull, retag, and push dev image
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:ci-${{ github.event.workflow_run.head_sha }}
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:ci-${{ github.event.workflow_run.head_sha }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev
+  detect-tag:
+    name: Detect v* Tag
+    runs-on: ubuntu-latest
+    outputs:
+      vtag: ${{ steps.find_tag.outputs.vtag }}
+    steps:
+      - uses: actions/checkout@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+          fetch-tags: true
 
-      - name: Build and push Development image
-        uses: docker/build-push-action@v6
-        if: github.ref == 'refs/heads/main'
-        with:
-          context: .
-          target: development
-          push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Find v* Tag
+        id: find_tag
+        run: |
+          echo "[Detect v* Tag] HEAD SHA: ${{ github.event.workflow_run.head_sha }}"
+          echo "[Detect v* Tag] All tags pointing at HEAD:"
+          git tag --points-at ${{ github.event.workflow_run.head_sha }}
+          TAG=$(git tag --points-at ${{ github.event.workflow_run.head_sha }} | grep -E '^v[0-9]' | head -n1 || true)
+          if [ -n "$TAG" ]; then
+            echo "[Detect v* Tag] Found v* tag: $TAG"
+          else
+            echo "[Detect v* Tag] No v* tag found."
+          fi
+          echo "vtag=$TAG" >> $GITHUB_OUTPUT
 
-      - name: Build and push Production image
-        uses: docker/build-push-action@v6
-        if: startsWith(github.ref, 'refs/tags/v')
+  prod-image:
+    name: Retag and Push Prod Image
+    runs-on: ubuntu-latest
+    needs: detect-tag
+    if: ${{ github.event.workflow_run.conclusion == 'success' && needs.detect-tag.outputs.vtag != '' }}
+    steps:
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
         with:
-          context: .
-          target: production
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull, retag, and push prod image
+        run: |
+          TAG=${{ needs.detect-tag.outputs.vtag }}
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:ci-${{ github.event.workflow_run.head_sha }}
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:ci-${{ github.event.workflow_run.head_sha }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$TAG
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$TAG
+          # Add these lines for latest
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:ci-${{ github.event.workflow_run.head_sha }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
