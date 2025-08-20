@@ -8,5 +8,13 @@
   "no-bare-urls": false,
   "no-duplicate-heading": {
     "siblings_only": true
-  }
+  },
+  "overrides": [
+    {
+      "files": ["README.md"],
+      "config": {
+        "MD033": false
+      }
+    }
+  ]
 }

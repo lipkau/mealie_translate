@@ -1,3 +1,4 @@
+<!-- markdownlint-disable-file MD033 -->
 # Mealie Recipe Translator
 
 [![CI](https://github.com/lipkau/mealie_translate/actions/workflows/ci.yml/badge.svg)](https://github.com/lipkau/mealie_translate/actions/workflows/ci.yml)
@@ -6,6 +7,10 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Docker](https://img.shields.io/badge/docker-available-blue.svg)](https://github.com/lipkau/mealie_translate/pkgs/container/mealie_translate)
+
+<p align="center">
+  <img src="assets/banner.jpg" alt="Mealie Translate Banner" style="max-width:100%;">
+</p>
 
 A Python application that translates [Mealie](https://mealie.io/) recipes using OpenAI's ChatGPT API and converts
 imperial units to metric.
@@ -98,8 +103,22 @@ make setup-full  # Complete development setup
 👥 **Contributing**: See our [Contributing Guide](.github/CONTRIBUTING.md) for development setup, coding standards,
 and contribution workflow.
 
-📚 **Documentation**: Complete guides available in [`docs/`](docs/) including deployment, development, and
-architecture details.## How It Works
+📚 **Documentation**: Complete guides available in [`docs/`](docs/) including deployment, development, and architecture details.
+
+## OpenAI Model Comparison
+
+<p align="center">
+  <img src="assets/openai_model_comparison.png"
+    alt="OpenAI Model Comparison Screenshot"
+    style="max-width:100%; border:1px solid #ccc;">
+</p>
+
+The screenshot above shows a side-by-side comparison of different OpenAI models on real Mealie recipe translation tasks.
+This helps users and contributors understand the strengths, weaknesses,
+and cost/performance tradeoffs of each model for recipe translation.
+For more details, see the documentation or the `tools/` directory for model evaluation scripts.
+
+## How It Works
 
 1. **Fetches recipes** from your Mealie instance
 2. **Filters processed** recipes (tracks via extras field)
