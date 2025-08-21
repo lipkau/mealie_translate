@@ -33,17 +33,17 @@ RUN useradd --create-home --shell /bin/bash app \
 
 WORKDIR /app
 
-# Stage 2: Development image with dev dependencies
-FROM base AS development
-
 # Copy entry script first
 COPY scripts/docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Copy all source files needed for editable install
+# Copy project files for dependency installation
 COPY --chown=app:app pyproject.toml ./
-COPY --chown=app:app main.py ./
 COPY --chown=app:app mealie_translate/ ./mealie_translate/
+COPY --chown=app:app main.py ./
+
+# Stage 2: Development image with dev dependencies
+FROM base AS development
 
 # Switch to app user
 USER app
@@ -59,22 +59,13 @@ COPY --chown=app:app . ./
 # USER root - not needed for development
 
 # Expose port for development server (if you add one later)
-EXPOSE 8000
+# EXPOSE 8000
 
 # Development command - for dev, just run once by default
 CMD ["python", "main.py"]
 
 # Stage 3: Production image (lightweight)
 FROM base AS production
-
-# Copy entry script first
-COPY scripts/docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-
-# Copy project files for dependency installation
-COPY --chown=app:app pyproject.toml ./
-COPY --chown=app:app mealie_translate/ ./mealie_translate/
-COPY --chown=app:app main.py ./
 
 # Install production dependencies globally (as root for cron access)
 RUN pip install .
