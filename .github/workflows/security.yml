@@ -62,7 +62,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
 
@@ -317,7 +317,7 @@ jobs:
 
       - name: Comment on commit (if triggered by CD)
         if: github.event_name == 'workflow_run' && needs.check-cd-status.outputs.should-scan == 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
