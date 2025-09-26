@@ -11,8 +11,7 @@ body:
         Before asking, please check:
         - [README.md](../../README.md) for basic usage
         - [Documentation folder](../../docs/) for detailed guides
-        - [Existing discussions](../../discussions) for similar questions
-        - [Closed issues](../../issues?q=is%3Aissue+is%3Aclosed) for previous solutions
+        - [Closed issues](http://github.com/lipkau/mealie_translate/issues?q=is%3Aissue+is%3Aclosed) for previous solutions
 
   - type: checkboxes
     id: checklist
