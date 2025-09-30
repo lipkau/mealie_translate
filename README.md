@@ -19,8 +19,9 @@ imperial units to metric.
 
 - **🌍 Recipe Translation**: Translates titles, descriptions, instructions, and ingredients
 - **📏 Unit Conversion**: Automatically converts imperial units (cups, pounds, °F) to metric (ml, grams, °C)
-- **⚡ Batch Processing**: Efficiently processes multiple recipes
+- **⚡ Batch Processing**: Processes all untagged recipes in configurable batches for efficiency
 - **🔄 Smart Tracking**: Prevents duplicate processing using recipe extras field
+- **⏰ Automated Scheduling**: Configurable cron-based execution to translate new recipes
 - **🛠️ Error Handling**: Robust retry logic with exponential backoff
 
 ## Quick Start with Docker
@@ -70,18 +71,18 @@ docker compose up -d
 
 Set these environment variables:
 
-| Variable           | Description                           | Example                         |
-| ------------------ | ------------------------------------- | ------------------------------- |
-| `MEALIE_BASE_URL`  | Your Mealie server URL                | `https://mealie.yourdomain.com` |
-| `MEALIE_API_TOKEN` | Mealie API token                      | `your-api-token-here`           |
-| `OPENAI_API_KEY`   | OpenAI API key                        | `sk-...`                        |
-| `OPENAI_MODEL`     | OpenAI Model.                         | `gpt-4o-mini`                   |
-| `TARGET_LANGUAGE`  | Language to translate to              | `English`                       |
-| `PROCESSED_TAG`    | Tag for processed recipes             | `translated`                    |
-| `BATCH_SIZE`.      | Nr of recipes to process per batch    | `10`                            |
-| `CRON_SCHEDULE`    | Schedule for automatic runs           | `0 */6 * * *` (every 6 hours)   |
-| `MAX_RETRIES`      | Retry attempts for failed API calls   | `3`                             |
-| `RETRY_DELAY`      | Base delay between retries in seconds | `1`                             |
+| Variable           | Description                              | Example                         |
+| ------------------ | ---------------------------------------- | ------------------------------- |
+| `MEALIE_BASE_URL`  | Your Mealie server URL                   | `https://mealie.yourdomain.com` |
+| `MEALIE_API_TOKEN` | Mealie API token                         | `your-api-token-here`           |
+| `OPENAI_API_KEY`   | OpenAI API key                           | `sk-...`                        |
+| `OPENAI_MODEL`     | OpenAI Model                             | `gpt-4o-mini`                   |
+| `TARGET_LANGUAGE`  | Language to translate to                 | `English`                       |
+| `PROCESSED_TAG`    | Tag for processed recipes                | `translated`                    |
+| `BATCH_SIZE`       | Number of recipes to process in parallel | `10`                            |
+| `CRON_SCHEDULE`    | Schedule for automatic runs              | `0 */6 * * *` (every 6 hours)   |
+| `MAX_RETRIES`      | Retry attempts for failed API calls      | `3`                             |
+| `RETRY_DELAY`      | Base delay between retries in seconds    | `1`                             |
 
 **Getting API tokens:**
 
