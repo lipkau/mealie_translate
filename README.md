@@ -19,8 +19,10 @@ imperial units to metric.
 
 - **🌍 Recipe Translation**: Translates titles, descriptions, instructions, and ingredients
 - **📏 Unit Conversion**: Automatically converts imperial units (cups, pounds, °F) to metric (ml, grams, °C)
-- **⚡ Batch Processing**: Efficiently processes multiple recipes
+- **⚡ Batch Processing**: Processes all untagged recipes in configurable batches for efficiency
 - **🔄 Smart Tracking**: Prevents duplicate processing using recipe extras field
+- **⏰ Automated Scheduling**: Configurable cron-based execution to translate new recipes
+- **🔬 Dry Run Mode**: Preview translations with detailed diffs before committing changes
 - **🛠️ Error Handling**: Robust retry logic with exponential backoff
 
 ## Quick Start with Docker
@@ -70,23 +72,65 @@ docker compose up -d
 
 Set these environment variables:
 
-| Variable           | Description                           | Example                         |
-| ------------------ | ------------------------------------- | ------------------------------- |
-| `MEALIE_BASE_URL`  | Your Mealie server URL                | `https://mealie.yourdomain.com` |
-| `MEALIE_API_TOKEN` | Mealie API token                      | `your-api-token-here`           |
-| `OPENAI_API_KEY`   | OpenAI API key                        | `sk-...`                        |
-| `OPENAI_MODEL`     | OpenAI Model.                         | `gpt-4o-mini`                   |
-| `TARGET_LANGUAGE`  | Language to translate to              | `English`                       |
-| `PROCESSED_TAG`    | Tag for processed recipes             | `translated`                    |
-| `BATCH_SIZE`.      | Nr of recipes to process per batch    | `10`                            |
-| `CRON_SCHEDULE`    | Schedule for automatic runs           | `0 */6 * * *` (every 6 hours)   |
-| `MAX_RETRIES`      | Retry attempts for failed API calls   | `3`                             |
-| `RETRY_DELAY`      | Base delay between retries in seconds | `1`                             |
+| Variable           | Description                              | Example                         |
+| ------------------ | ---------------------------------------- | ------------------------------- |
+| `MEALIE_BASE_URL`  | Your Mealie server URL                   | `https://mealie.yourdomain.com` |
+| `MEALIE_API_TOKEN` | Mealie API token                         | `your-api-token-here`           |
+| `OPENAI_API_KEY`   | OpenAI API key                           | `sk-...`                        |
+| `OPENAI_MODEL`     | OpenAI Model                             | `gpt-4o-mini`                   |
+| `TARGET_LANGUAGE`  | Language to translate to                 | `English`                       |
+| `PROCESSED_TAG`    | Tag for processed recipes                | `translated`                    |
+| `BATCH_SIZE`       | Number of recipes to process in parallel | `10`                            |
+| `DRY_RUN`          | Enable dry run mode (no changes made)    | `false`                         |
+| `DRY_RUN_LIMIT`    | Max recipes to process in dry run        | `5`                             |
+| `CRON_SCHEDULE`    | Schedule for automatic runs              | `0 */6 * * *` (every 6 hours)   |
+| `MAX_RETRIES`      | Retry attempts for failed API calls      | `3`                             |
+| `RETRY_DELAY`      | Base delay between retries in seconds    | `1`                             |
 
 **Getting API tokens:**
 
 - **Mealie**: Go to Settings → API Tokens in your Mealie instance
 - **OpenAI**: Visit [OpenAI API Keys](https://platform.openai.com/api-keys)
+
+## Dry Run Mode
+
+🔍 **Testing before committing changes**: Use dry run mode to preview translations and verify quality before
+modifying your recipes.
+
+```bash
+# Enable dry run mode to test 5 recipes
+docker run --rm \
+  -e MEALIE_BASE_URL="https://your-mealie-instance.com" \
+  -e MEALIE_API_TOKEN="your-mealie-api-token" \
+  -e OPENAI_API_KEY="your-openai-api-key" \
+  -e DRY_RUN=true \
+  -e DRY_RUN_LIMIT=5 \
+  ghcr.io/lipkau/mealie_translate:latest
+```
+
+**What dry run mode provides:**
+
+- **📋 Detailed Diffs**: Shows before/after comparison for each field (title, description, instructions, ingredients)
+- **🔒 No Changes**: Recipes remain unmodified in Mealie
+- **📊 Translation Quality**: Review OpenAI's translation accuracy and unit conversions
+- **🎯 Prompt Tuning**: Test different prompts and settings before full deployment
+- **📝 Structured Logs**: Easy-to-read output showing exactly what would change
+
+**Example dry run output:**
+
+```text
+[DRY RUN] Recipe: Chocolate Chip Cookies
+┌─ Title ────────────────────────────────────────┐
+│ - Chocolate Chip Cookies                       │
+│ + Chocolate Chip Cookies (English)             │
+└────────────────────────────────────────────────┘
+┌─ Instructions ─────────────────────────────────┐
+│ - Preheat oven to 350°F                        │
+│ + Preheat oven to 175°C                        │
+│ - Add 2 cups flour                             │
+│ + Add 480ml flour                              │
+└────────────────────────────────────────────────┘
+```
 
 ## Unit Conversions
 

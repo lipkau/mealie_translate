@@ -14,6 +14,7 @@ services:
       TARGET_LANGUAGE: ${TARGET_LANGUAGE:-German}
       BATCH_SIZE: ${BATCH_SIZE:-5}
       DRY_RUN: ${DRY_RUN:-false}
+      DRY_RUN_LIMIT: ${DRY_RUN_LIMIT:-5}
       CRON_SCHEDULE: ${CRON_SCHEDULE:-0 */6 * * *}
     env_file:
       - .env
@@ -37,6 +38,7 @@ services:
       TARGET_LANGUAGE: ${TARGET_LANGUAGE:-German}
       BATCH_SIZE: ${BATCH_SIZE:-5}
       DRY_RUN: ${DRY_RUN:-true}
+      DRY_RUN_LIMIT: ${DRY_RUN_LIMIT:-5}
       CRON_SCHEDULE: ${CRON_SCHEDULE:-*/30 * * * *}
     env_file:
       - .env

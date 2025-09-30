@@ -17,6 +17,7 @@ services:
       # BATCH_SIZE: 20
       # TARGET_LANGUAGE: "Spanish"
       # DRY_RUN: false
+      # DRY_RUN_LIMIT: 10
 
   mealie-translator-dev:
     volumes:
@@ -28,6 +29,7 @@ services:
       # More frequent runs for development/testing
       CRON_SCHEDULE: "*/15 * * * *"
       DRY_RUN: "true"
+      DRY_RUN_LIMIT: "3"
       LOG_LEVEL: "DEBUG"
     ports:
       # Expose port if you add a web interface later

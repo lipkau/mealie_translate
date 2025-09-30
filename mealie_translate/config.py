@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     max_retries: int = 3
     retry_delay: float = 1.0
 
+    # Dry Run Configuration
+    dry_run: bool = False
+    dry_run_limit: int = 5
+
     # Scheduling Configuration (for Docker containers)
     cron_schedule: str = "0 */6 * * *"
 
@@ -40,6 +44,14 @@ class Settings(BaseSettings):
     def validate_target_language(cls, v):
         """Ensure target language is properly formatted."""
         return v.strip().title()
+
+    @field_validator("dry_run_limit")
+    @classmethod
+    def validate_dry_run_limit(cls, v):
+        """Ensure dry run limit is positive."""
+        if v <= 0:
+            raise ValueError("dry_run_limit must be positive")
+        return v
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
