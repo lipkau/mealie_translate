@@ -1,15 +1,18 @@
-"""OpenAI translation service for recipe content."""
+"""OpenAI-based translation provider implementation."""
 
+import logging
 import time
 from typing import Any
 
 from openai import OpenAI
 
-from .config import Settings
+from .translator_interface import TranslationError, TranslatorInterface
+
+logger = logging.getLogger(__name__)
 
 
-class RecipeTranslator:
-    """Handles translation of recipe content using OpenAI ChatGPT."""
+class OpenAITranslator(TranslatorInterface):
+    """Translator implementation using OpenAI's ChatGPT API."""
 
     # Reusable prompt components
     UNIT_CONVERSION_RULES = """
@@ -51,64 +54,117 @@ TRANSLATION RULES:
 You must preserve the exact structure and format of the input while translating text content AND converting imperial units to metric equivalents.
 Never add explanations, commentary, or modify the format of the response."""
 
-    def __init__(self, settings: Settings):
-        """Initialize the translator.
+    def __init__(
+        self,
+        api_key: str,
+        model: str,
+        target_language: str,
+        max_retries: int = 3,
+        retry_delay: int = 1,
+    ):
+        """Initialize the OpenAI translator.
 
         Args:
-            settings: Application settings containing API configuration
+            api_key: OpenAI API key
+            model: OpenAI model to use (e.g., 'gpt-4', 'gpt-3.5-turbo')
+            target_language: Target language for translations
+            max_retries: Maximum number of retries for API calls
+            retry_delay: Base delay between retries in seconds
         """
-        self.client = OpenAI(api_key=settings.openai_api_key)
-        self.target_language = settings.target_language
-        self.max_retries = settings.max_retries
-        self.retry_delay = settings.retry_delay
-        self.model = settings.openai_model
+        self.client = OpenAI(api_key=api_key)
+        self.model = model
+        self.target_language = target_language
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
 
-    def translate_recipe(self, recipe: dict[str, Any]) -> dict[str, Any]:
-        """Translate a complete recipe to the target language.
+    def get_provider_name(self) -> str:
+        """Get the name of the translation provider."""
+        return "openai"
 
-        Args:
-            recipe: Recipe dictionary with content to translate
+    def is_available(self) -> bool:
+        """Check if OpenAI API is available and properly configured.
 
         Returns:
-            Updated recipe dictionary with translated content
+            True if OpenAI API is accessible, False otherwise
+        """
+        try:
+            # Make a minimal API call to check availability
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": "test"}],
+                max_tokens=1,
+                temperature=0.1,
+            )
+            return response.choices[0].message.content is not None
+        except Exception as e:
+            logger.warning(f"OpenAI API not available: {e}")
+            return False
+
+    def translate_recipe(
+        self, recipe_data: dict[str, Any], target_language: str
+    ) -> dict[str, Any]:
+        """Translate a recipe using OpenAI.
+
+        Args:
+            recipe_data: The recipe data to translate
+            target_language: The target language code
+
+        Returns:
+            The translated recipe data
 
         Raises:
-            Exception: If translation fails after all retries
+            TranslationError: If translation fails
         """
-        translated_recipe = recipe.copy()
+        try:
+            # Use the provided target language or fall back to instance default
+            translation_language = target_language or self.target_language
+            translated_recipe = recipe_data.copy()
 
-        # Translate main fields
-        if recipe.get("name"):
-            translated_recipe["name"] = self._translate_text(recipe["name"])
+            # Translate main fields
+            if recipe_data.get("name"):
+                translated_recipe["name"] = self._translate_text(
+                    recipe_data["name"], translation_language
+                )
 
-        if recipe.get("description"):
-            translated_recipe["description"] = self._translate_text(
-                recipe["description"]
+            if recipe_data.get("description"):
+                translated_recipe["description"] = self._translate_text(
+                    recipe_data["description"], translation_language
+                )
+
+            # Translate instructions
+            if recipe_data.get("recipeInstructions"):
+                translated_recipe["recipeInstructions"] = self._translate_instructions(
+                    recipe_data["recipeInstructions"], translation_language
+                )
+
+            # Translate ingredients
+            if recipe_data.get("recipeIngredient"):
+                translated_recipe["recipeIngredient"] = self._translate_ingredients(
+                    recipe_data["recipeIngredient"], translation_language
+                )
+
+            # Translate notes if present
+            if recipe_data.get("notes"):
+                translated_recipe["notes"] = self._translate_notes(
+                    recipe_data["notes"], translation_language
+                )
+
+            logger.info(
+                f"Successfully translated recipe '{recipe_data.get('name', 'Unknown')}' to {translation_language}"
             )
+            return translated_recipe
 
-        # Translate instructions
-        if recipe.get("recipeInstructions"):
-            translated_recipe["recipeInstructions"] = self._translate_instructions(
-                recipe["recipeInstructions"]
-            )
+        except Exception as e:
+            raise TranslationError(
+                f"Failed to translate recipe: {e}", provider="openai", cause=e
+            ) from e
 
-        # Translate ingredients
-        if recipe.get("recipeIngredient"):
-            translated_recipe["recipeIngredient"] = self._translate_ingredients(
-                recipe["recipeIngredient"]
-            )
-
-        # Translate notes if present
-        if recipe.get("notes"):
-            translated_recipe["notes"] = self._translate_notes(recipe["notes"])
-
-        return translated_recipe
-
-    def _translate_text(self, text: str) -> str:
+    def _translate_text(self, text: str, target_language: str) -> str:
         """Translate a single text string.
 
         Args:
             text: Text to translate
+            target_language: Target language for translation
 
         Returns:
             Translated text
@@ -117,7 +173,7 @@ Never add explanations, commentary, or modify the format of the response."""
             return text
 
         translation_rules = self.TRANSLATION_RULES_BASE.format(
-            target_language=self.target_language
+            target_language=target_language
         )
 
         conversion_examples = """
@@ -131,7 +187,7 @@ Examples:
 """
 
         prompt = f"""
-You are a professional recipe translator and unit converter. Translate the following text to {self.target_language} AND convert imperial units to metric.
+You are a professional recipe translator and unit converter. Translate the following text to {target_language} AND convert imperial units to metric.
 
 {translation_rules}
 
@@ -145,12 +201,13 @@ Text to translate and convert: {text}
         return self._call_openai(prompt)
 
     def _translate_instructions(
-        self, instructions: list[dict[str, Any]]
+        self, instructions: list[dict[str, Any]], target_language: str
     ) -> list[dict[str, Any]]:
         """Translate recipe instructions.
 
         Args:
             instructions: List of instruction dictionaries
+            target_language: Target language for translation
 
         Returns:
             List of translated instruction dictionaries
@@ -165,7 +222,7 @@ Text to translate and convert: {text}
 
             if instruction.get("text"):
                 translated_instruction["text"] = self._translate_text(
-                    instruction["text"]
+                    instruction["text"], target_language
                 )
 
             translated_instructions.append(translated_instruction)
@@ -173,12 +230,13 @@ Text to translate and convert: {text}
         return translated_instructions
 
     def _translate_ingredients(
-        self, ingredients: list[dict[str, Any]]
+        self, ingredients: list[dict[str, Any]], target_language: str
     ) -> list[dict[str, Any]]:
         """Translate recipe ingredients.
 
         Args:
             ingredients: List of ingredient dictionaries
+            target_language: Target language for translation
 
         Returns:
             List of translated ingredient dictionaries
@@ -198,7 +256,9 @@ Text to translate and convert: {text}
             return ingredients
 
         # Batch translate for efficiency
-        translated_texts = self._translate_ingredient_batch(ingredient_texts)
+        translated_texts = self._translate_ingredient_batch(
+            ingredient_texts, target_language
+        )
 
         # Apply translations back to ingredients
         translated_ingredients = []
@@ -219,11 +279,14 @@ Text to translate and convert: {text}
 
         return translated_ingredients
 
-    def _translate_ingredient_batch(self, texts: list[str]) -> list[str]:
+    def _translate_ingredient_batch(
+        self, texts: list[str], target_language: str
+    ) -> list[str]:
         """Translate a batch of ingredient texts.
 
         Args:
             texts: List of texts to translate
+            target_language: Target language for translation
 
         Returns:
             List of translated texts
@@ -238,7 +301,7 @@ Text to translate and convert: {text}
 TRANSLATION RULES:
 1. ONLY translate ingredient names and descriptions
 2. Preserve any formatting, punctuation, and special characters
-3. If an ingredient is already in {self.target_language}, keep the translation unchanged
+3. If an ingredient is already in {target_language}, keep the translation unchanged
 4. Return translations in the EXACT same numbered format, one per line
 5. Do not add explanations or additional text
 """
@@ -252,7 +315,7 @@ Examples:
 """
 
         prompt = f"""
-You are a professional recipe translator and unit converter. Translate the following ingredient texts to {self.target_language} AND convert imperial units to metric.
+You are a professional recipe translator and unit converter. Translate the following ingredient texts to {target_language} AND convert imperial units to metric.
 
 {ingredient_translation_rules}
 
@@ -286,11 +349,14 @@ Return the translations with unit conversions in the same numbered format:
 
         return translated_texts[: len(texts)]
 
-    def _translate_notes(self, notes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def _translate_notes(
+        self, notes: list[dict[str, Any]], target_language: str
+    ) -> list[dict[str, Any]]:
         """Translate recipe notes.
 
         Args:
             notes: List of note dictionaries
+            target_language: Target language for translation
 
         Returns:
             List of translated note dictionaries
@@ -304,10 +370,14 @@ Return the translations with unit conversions in the same numbered format:
             translated_note = note.copy()
 
             if note.get("title"):
-                translated_note["title"] = self._translate_text(note["title"])
+                translated_note["title"] = self._translate_text(
+                    note["title"], target_language
+                )
 
             if note.get("text"):
-                translated_note["text"] = self._translate_text(note["text"])
+                translated_note["text"] = self._translate_text(
+                    note["text"], target_language
+                )
 
             translated_notes.append(translated_note)
 
@@ -324,50 +394,40 @@ Return the translations with unit conversions in the same numbered format:
             The response text from OpenAI
 
         Raises:
-            Exception: If all retries fail
+            TranslationError: If all retries fail
         """
         model_to_use = model or self.model
 
         for attempt in range(self.max_retries):
             try:
-                # Handle different parameter requirements for different model versions
-                request_params = {
-                    "model": model_to_use,
-                    "messages": [
+                response = self.client.chat.completions.create(
+                    model=model_to_use,
+                    messages=[
                         {
                             "role": "system",
                             "content": self.SYSTEM_MESSAGE,
                         },
                         {"role": "user", "content": prompt},
                     ],
-                }
-
-                # GPT-5 models and o1 models have different parameter requirements
-                if model_to_use.startswith(("gpt-5", "o1")):
-                    request_params["max_completion_tokens"] = 2000
-                    # GPT-5 and o1 models only support temperature=1.0 (default)
-                    # Don't set temperature parameter, let it use default
-                else:
-                    request_params["max_tokens"] = 2000
-                    request_params["temperature"] = (
-                        0.1  # Low temperature for consistent translations
-                    )
-
-                response = self.client.chat.completions.create(**request_params)
+                    max_tokens=2000,  # Increased for longer recipes
+                    temperature=0.1,  # Low temperature for consistent translations
+                )
 
                 content = response.choices[0].message.content
                 return content.strip() if content else ""
 
             except Exception as e:
-                print(
+                logger.warning(
                     f"OpenAI API error (attempt {attempt + 1}/{self.max_retries}): {e}"
                 )
 
                 if attempt < self.max_retries - 1:
                     time.sleep(self.retry_delay * (2**attempt))  # Exponential backoff
                 else:
-                    raise Exception(
-                        f"Failed to translate after {self.max_retries} attempts: {e}"
+                    raise TranslationError(
+                        f"Failed to translate after {self.max_retries} attempts: {e}",
+                        provider="openai",
+                        cause=e,
                     ) from e
 
         return ""  # Fallback return

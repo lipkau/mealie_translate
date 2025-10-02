@@ -69,25 +69,76 @@ docker compose up -d
 
 ### Configuration
 
-Set these environment variables:
+#### Required Variables
 
-| Variable           | Description                              | Example                         |
-| ------------------ | ---------------------------------------- | ------------------------------- |
-| `MEALIE_BASE_URL`  | Your Mealie server URL                   | `https://mealie.yourdomain.com` |
-| `MEALIE_API_TOKEN` | Mealie API token                         | `your-api-token-here`           |
-| `OPENAI_API_KEY`   | OpenAI API key                           | `sk-...`                        |
-| `OPENAI_MODEL`     | OpenAI Model                             | `gpt-4o-mini`                   |
-| `TARGET_LANGUAGE`  | Language to translate to                 | `English`                       |
-| `PROCESSED_TAG`    | Tag for processed recipes                | `translated`                    |
-| `BATCH_SIZE`       | Number of recipes to process in parallel | `10`                            |
-| `CRON_SCHEDULE`    | Schedule for automatic runs              | `0 */6 * * *` (every 6 hours)   |
-| `MAX_RETRIES`      | Retry attempts for failed API calls      | `3`                             |
-| `RETRY_DELAY`      | Base delay between retries in seconds    | `1`                             |
+| Variable              | Description            | Example                         |
+| --------------------- | ---------------------- | ------------------------------- |
+| `MEALIE_BASE_URL`     | Your Mealie server URL | `https://mealie.yourdomain.com` |
+| `MEALIE_API_TOKEN`    | Mealie API token       | `your-api-token-here`           |
+| `TRANSLATOR_PROVIDER` | AI provider to use     | `openai` or `ollama`            |
+
+#### Provider-Specific Required Variables
+
+**For OpenAI:**
+
+| Variable         | Description    | Example  |
+| ---------------- | -------------- | -------- |
+| `OPENAI_API_KEY` | OpenAI API key | `sk-...` |
+
+**For Ollama:**
+
+_All configuration is optional._
+
+#### Optional Variables
+
+| Variable          | Description                              | Default                       |
+| ----------------- | ---------------------------------------- | ----------------------------- |
+| `OPENAI_MODEL`    | OpenAI model (if using OpenAI)           | `gpt-4o-mini`                 |
+| `OLLAMA_BASE_URL` | Ollama server URL                        | `http://localhost:11434`      |
+| `OLLAMA_MODEL`    | Ollama model name                        | `llama2`                      |
+| `OLLAMA_TIMEOUT`  | Ollama request timeout (if using Ollama) | `60` seconds                  |
+| `TARGET_LANGUAGE` | Language to translate to                 | `English`                     |
+| `PROCESSED_TAG`   | Tag for processed recipes                | `translated`                  |
+| `BATCH_SIZE`      | Number of recipes to process in parallel | `10`                          |
+| `CRON_SCHEDULE`   | Schedule for automatic runs              | `0 */6 * * *` (every 6 hours) |
+| `MAX_RETRIES`     | Retry attempts for failed API calls      | `3`                           |
+| `RETRY_DELAY`     | Base delay between retries in seconds    | `1`                           |
+| `DRY_RUN`         | Preview mode without making changes      | `false`                       |
+| `DRY_RUN_LIMIT`   | Max recipes to show in dry run           | `5`                           |
 
 **Getting API tokens:**
 
 - **Mealie**: Go to Settings → API Tokens in your Mealie instance
 - **OpenAI**: Visit [OpenAI API Keys](https://platform.openai.com/api-keys)
+
+## AI Provider Options
+
+This application supports multiple AI providers for recipe translation:
+
+### OpenAI
+
+Cloud-based translation using OpenAI's ChatGPT models.
+Requires internet connection and API key.
+
+```yaml
+environment:
+  - TRANSLATOR_PROVIDER=openai
+  - OPENAI_API_KEY=your-openai-api-key
+  - OPENAI_MODEL=gpt-4o-mini
+```
+
+### Ollama (Local AI)
+
+Run translations locally using [Ollama](https://ollama.ai/) for privacy and cost savings.
+No internet required after initial setup.
+
+```yaml
+environment:
+  - TRANSLATOR_PROVIDER=ollama
+  - OLLAMA_BASE_URL=http://ollama-server:11434
+  - OLLAMA_MODEL=llama2
+  - OLLAMA_TIMEOUT=120
+```
 
 ## Unit Conversions
 
@@ -129,7 +180,7 @@ For more details, see the documentation or the `tools/` directory for model eval
 
 1. **Fetches recipes** from your Mealie instance
 2. **Filters processed** recipes (tracks via extras field)
-3. **Translates content** using OpenAI's ChatGPT
+3. **Translates content** using your chosen AI provider (OpenAI or Ollama)
 4. **Converts units** from imperial to metric
 5. **Updates recipes** in Mealie with translated content
 

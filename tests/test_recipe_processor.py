@@ -1,6 +1,6 @@
 """Additional tests for recipe processor."""
 
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -26,8 +26,11 @@ def processor(mock_settings):
     """Create a RecipeProcessor instance for testing."""
     with (
         patch("mealie_translate.recipe_processor.MealieClient") as _mock_client,
-        patch("mealie_translate.recipe_processor.RecipeTranslator") as _mock_translator,
+        patch("mealie_translate.recipe_processor.TranslatorFactory") as _mock_factory,
     ):
+        # Configure the factory to return a mock translator
+        mock_translator = Mock()
+        _mock_factory.create_translator.return_value = mock_translator
         return RecipeProcessor(mock_settings)
 
 
@@ -35,13 +38,17 @@ def test_processor_initialization(mock_settings):
     """Test RecipeProcessor initialization."""
     with (
         patch("mealie_translate.recipe_processor.MealieClient") as mock_client,
-        patch("mealie_translate.recipe_processor.RecipeTranslator") as mock_translator,
+        patch("mealie_translate.recipe_processor.TranslatorFactory") as mock_factory,
     ):
+        # Configure the factory to return a mock translator
+        mock_translator = Mock()
+        mock_factory.create_translator.return_value = mock_translator
+
         processor = RecipeProcessor(mock_settings)
 
         assert processor.settings == mock_settings
         mock_client.assert_called_once_with(mock_settings)
-        mock_translator.assert_called_once_with(mock_settings)
+        mock_factory.create_translator.assert_called_once_with(mock_settings)
 
 
 def test_filter_unprocessed_recipes(processor):

@@ -5,7 +5,7 @@ from typing import Any
 
 from .config import Settings, get_settings
 from .mealie_client import MealieClient
-from .translator import RecipeTranslator
+from .translator_factory import TranslatorFactory
 
 
 class RecipeProcessor:
@@ -20,7 +20,7 @@ class RecipeProcessor:
         """
         self.settings = settings or get_settings()
         self.mealie_client = MealieClient(self.settings)
-        self.translator = RecipeTranslator(self.settings)
+        self.translator = TranslatorFactory.create_translator(self.settings)
 
     def process_all_recipes(self) -> dict[str, int]:
         """Process all recipes in the Mealie server.
@@ -140,7 +140,9 @@ class RecipeProcessor:
                 return True
 
             # Translate the recipe
-            translated_recipe = self.translator.translate_recipe(recipe)
+            translated_recipe = self.translator.translate_recipe(
+                recipe, self.settings.target_language
+            )
 
             # Update the recipe
             success = self.mealie_client.update_recipe(recipe_slug, translated_recipe)
@@ -210,7 +212,9 @@ class RecipeProcessor:
                     continue
 
                 # Translate the recipe
-                translated_recipe = self.translator.translate_recipe(full_recipe)
+                translated_recipe = self.translator.translate_recipe(
+                    full_recipe, self.settings.target_language
+                )
 
                 # Update the recipe in Mealie
                 success = self.mealie_client.update_recipe(

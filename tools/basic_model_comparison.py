@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Model comparison script to test different GPT models for recipe translation and unit conversion.
+"""Model comparison script to test different GPT models for recipe translation and unit conversion.
 
 This script directly calls methods from the production RecipeTranslator class,
 ensuring perfect consistency and automatic updates when prompts are improved.
@@ -9,7 +8,7 @@ ensuring perfect consistency and automatic updates when prompts are improved.
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 # Add the package to the Python path
 project_dir = Path(__file__).parent.parent
@@ -29,13 +28,15 @@ class ModelComparison:
 
         # Models to compare - you can update these when new models become available
         self.models = [
-            "gpt-4o-mini",
-            "gpt-4o",
             "gpt-3.5-turbo",
-            # Uncomment these when they become available:
+            "gpt-4o",
+            "gpt-4o-mini",
             "gpt-4.1",
             "gpt-4.1-mini",
             "gpt-4.1-nano",
+            "gpt-5",
+            "gpt-5-mini",
+            "gpt-5-nano",
         ]
 
         # Test cases for comparison
@@ -62,7 +63,7 @@ class ModelComparison:
             },
         ]
 
-    def test_model(self, model_name: str) -> Dict[str, Any]:
+    def test_model(self, model_name: str) -> dict[str, Any]:
         """Test a specific model with all test cases."""
         print(f"\n🧪 Testing model: {model_name}")
         print("-" * 50)
@@ -149,7 +150,7 @@ class ModelComparison:
 
         return results
 
-    def run_comparison(self) -> Dict[str, Any]:
+    def run_comparison(self) -> dict[str, Any]:
         """Run comparison across all models."""
         print("🔬 GPT Model Comparison for Recipe Translation & Unit Conversion")
         print("=" * 70)
@@ -173,7 +174,7 @@ class ModelComparison:
 
         return all_results
 
-    def print_summary(self, all_results: Dict[str, Any]):
+    def print_summary(self, all_results: dict[str, Any]):
         """Print a summary comparison of all models."""
         print("\n" + "=" * 70)
         print("📊 COMPARISON SUMMARY")
@@ -236,7 +237,7 @@ def main():
 
         # Optionally save detailed results
         print(
-            f"\n💾 To see detailed results for any model, check the test_results in the returned data"
+            "\n💾 To see detailed results for any model, check the test_results in the returned data"
         )
 
         return True

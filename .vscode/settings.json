@@ -13,6 +13,7 @@
   "ruff.lineLength": 88,
   "ruff.enable": true,
   "python.languageServer": "Pylance",
+  "mypy-type-checker.severity": { "error": "Hint" },
   "files.exclude": {
     "**/__pycache__": true,
     "**/.pytest_cache": true,
@@ -20,5 +21,8 @@
     "**/htmlcov": true,
     "**/*.egg-info": true
   },
-  "flake8.enabled": false
+  "flake8.enabled": false,
+  "files.associations": {
+    "docker-compose*": "dockercompose"
+  }
 }

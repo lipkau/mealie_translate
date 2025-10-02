@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
-"""
-Detailed model comparison with full output analysis.
+"""Detailed model comparison with full output analysis.
 Easily configurable for new models like gpt-4.1, gpt-4.1-mini, gpt-4.1-nano when available.
 
 This script directly calls methods from the production RecipeTranslator class,
 ensuring perfect consistency and automatic updates when prompts are improved.
 """
 
-import json
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 # Add the package to the Python path
 project_dir = Path(__file__).parent.parent
@@ -22,12 +20,15 @@ from mealie_translate.translator import RecipeTranslator
 
 # CONFIGURATION: Update this list when new models become available
 AVAILABLE_MODELS = [
-    "gpt-4o-mini",  # Currently used in production
-    "gpt-4o",  # More powerful but slower
-    "gpt-3.5-turbo",  # Faster but less accurate
-    "gpt-4.1",  # Uncomment when available
-    "gpt-4.1-mini",  # Uncomment when available
-    "gpt-4.1-nano",  # Uncomment when available
+    "gpt-3.5-turbo",
+    "gpt-4o",
+    "gpt-4o-mini",
+    "gpt-4.1",
+    "gpt-4.1-mini",
+    "gpt-4.1-nano",
+    "gpt-5",
+    "gpt-5-mini",
+    "gpt-5-nano",
 ]
 
 # Test cases focusing on unit conversion accuracy
@@ -65,7 +66,7 @@ TEST_CASES = [
 ]
 
 
-def test_single_model(model_name: str, settings) -> Dict[str, Any]:
+def test_single_model(model_name: str, settings) -> dict[str, Any]:
     """Test a single model with detailed output analysis."""
     print(f"\n🔬 Testing {model_name}")
     print("=" * 60)
@@ -154,7 +155,7 @@ def test_single_model(model_name: str, settings) -> Dict[str, Any]:
 
             print(f"   Output: ERROR - {e}")
             print(f"   Time: {test_time:.2f}s")
-            print(f"   Status: ❌ ERROR")
+            print("   Status: ❌ ERROR")
 
             results["summary"]["failed"] += 1
             results["tests"].append(
@@ -175,7 +176,7 @@ def test_single_model(model_name: str, settings) -> Dict[str, Any]:
     return results
 
 
-def print_comparison_summary(all_results: List[Dict[str, Any]]):
+def print_comparison_summary(all_results: list[dict[str, Any]]):
     """Print a comprehensive comparison summary."""
     print("\n" + "=" * 80)
     print("📊 COMPREHENSIVE MODEL COMPARISON SUMMARY")
@@ -220,7 +221,7 @@ def print_comparison_summary(all_results: List[Dict[str, Any]]):
         print(f"   Average Time: {best['summary']['avg_time']:.2f}s")
 
         # Show what makes it best
-        print(f"\n🔍 Detailed Analysis:")
+        print("\n🔍 Detailed Analysis:")
         for test in best["tests"]:
             status_icon = (
                 "✅"
@@ -256,9 +257,9 @@ def main():
         if all_results:
             print_comparison_summary(all_results)
 
-        print(f"\n💡 To test GPT-4.1 models when available:")
-        print(f"   1. Uncomment the model names in AVAILABLE_MODELS")
-        print(f"   2. Run this script again")
+        print("\n💡 To test GPT-4.1 models when available:")
+        print("   1. Uncomment the model names in AVAILABLE_MODELS")
+        print("   2. Run this script again")
 
         return True
 

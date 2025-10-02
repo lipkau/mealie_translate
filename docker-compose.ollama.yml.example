@@ -1,0 +1,79 @@
+services:
+  # Ollama AI service for local translation
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    environment:
+      - OLLAMA_ORIGINS=*
+    restart: unless-stopped
+
+    # Optional: GPU support for better performance
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  # Mealie Recipe Translator using local Ollama
+  mealie-translator:
+    image: ghcr.io/lipkau/mealie_translate:latest
+    container_name: mealie-translator
+    depends_on:
+      - ollama
+    environment:
+      # Mealie Configuration
+      - MEALIE_BASE_URL=${MEALIE_BASE_URL}
+      - MEALIE_API_TOKEN=${MEALIE_API_TOKEN}
+
+      # Ollama Configuration
+      - TRANSLATOR_PROVIDER=ollama
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama2}
+      - OLLAMA_TIMEOUT=${OLLAMA_TIMEOUT:-120}
+
+      # Translation Configuration
+      - TARGET_LANGUAGE=${TARGET_LANGUAGE:-English}
+      - PROCESSED_TAG=${PROCESSED_TAG:-translated}
+
+      # Processing Configuration
+      - CRON_SCHEDULE=${CRON_SCHEDULE:-0 */6 * * *}
+      - BATCH_SIZE=${BATCH_SIZE:-5}
+      - MAX_RETRIES=${MAX_RETRIES:-3}
+      - RETRY_DELAY=${RETRY_DELAY:-2}
+
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+
+    restart: unless-stopped
+
+    # Optional: Mount logs directory
+    # volumes:
+    #   - ./logs:/var/log
+
+volumes:
+  ollama-data:
+    driver: local
+# ==============================================================================
+# Ollama Setup Instructions
+# ==============================================================================
+# 1. Copy .env.example to .env and configure your Mealie settings
+# 2. Start the services: docker-compose -f docker-compose.ollama.yml up -d
+# 3. Download a model: docker exec ollama ollama pull llama2
+# 4. Wait for the translator to start processing recipes
+#
+# Recommended Models:
+# - llama2: Good balance of quality and speed (7B parameters)
+# - llama2:13b: Higher quality, slower (13B parameters)
+# - mistral: Fast and efficient (7B parameters)
+# - codellama: Better for structured content (7B parameters)
+#
+# GPU Support:
+# Uncomment the deploy section under ollama service for GPU acceleration
+# Requires nvidia-docker runtime: https://docs.nvidia.com/datacenter/cloud-native/
+# ==============================================================================

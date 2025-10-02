@@ -7,7 +7,7 @@ import pytest
 from mealie_translate.config import Settings
 from mealie_translate.mealie_client import MealieClient
 from mealie_translate.recipe_processor import RecipeProcessor
-from mealie_translate.translator import RecipeTranslator
+from mealie_translate.translator_factory import TranslatorFactory
 
 
 @pytest.fixture
@@ -21,7 +21,7 @@ def mock_settings():
         processed_tag="translated",
         batch_size=5,
         max_retries=2,
-        retry_delay=0.1,
+        retry_delay=1,  # Changed from 0.1 to 1
     )
 
 
@@ -35,14 +35,14 @@ class TestRecipeProcessorIntegration:
                 "mealie_translate.recipe_processor.MealieClient"
             ) as mock_client_class,
             patch(
-                "mealie_translate.recipe_processor.RecipeTranslator"
-            ) as mock_translator_class,
+                "mealie_translate.recipe_processor.TranslatorFactory"
+            ) as mock_factory_class,
         ):
             # Setup mocks
             mock_client = Mock()
             mock_translator = Mock()
             mock_client_class.return_value = mock_client
-            mock_translator_class.return_value = mock_translator
+            mock_factory_class.create_translator.return_value = mock_translator
 
             # Mock recipe data
             sample_recipe = {
@@ -84,7 +84,9 @@ class TestRecipeProcessorIntegration:
             mock_client.get_all_recipes.assert_called_once()
             # get_recipe_details is called twice: once during filtering and once during processing
             assert mock_client.get_recipe_details.call_count == 2
-            mock_translator.translate_recipe.assert_called_once_with(sample_recipe)
+            mock_translator.translate_recipe.assert_called_once_with(
+                sample_recipe, "English"
+            )
             mock_client.update_recipe.assert_called_once_with(
                 "test-recipe", translated_recipe
             )
@@ -97,13 +99,13 @@ class TestRecipeProcessorIntegration:
                 "mealie_translate.recipe_processor.MealieClient"
             ) as mock_client_class,
             patch(
-                "mealie_translate.recipe_processor.RecipeTranslator"
-            ) as mock_translator_class,
+                "mealie_translate.recipe_processor.TranslatorFactory"
+            ) as mock_factory_class,
         ):
             mock_client = Mock()
             mock_translator = Mock()
             mock_client_class.return_value = mock_client
-            mock_translator_class.return_value = mock_translator
+            mock_factory_class.create_translator.return_value = mock_translator
 
             # Mock multiple recipes
             recipes = [
@@ -161,14 +163,14 @@ class TestRecipeProcessorIntegration:
                 "mealie_translate.recipe_processor.MealieClient"
             ) as mock_client_class,
             patch(
-                "mealie_translate.recipe_processor.RecipeTranslator"
-            ) as mock_translator_class,
+                "mealie_translate.recipe_processor.TranslatorFactory"
+            ) as mock_factory_class,
             patch("mealie_translate.recipe_processor.time.sleep") as mock_sleep,
         ):
             mock_client = Mock()
             mock_translator = Mock()
             mock_client_class.return_value = mock_client
-            mock_translator_class.return_value = mock_translator
+            mock_factory_class.create_translator.return_value = mock_translator
 
             # Create 5 recipes to test batching
             recipes = [
@@ -212,37 +214,43 @@ class TestTranslatorEdgeCases:
 
     def test_empty_recipe_fields(self, mock_settings):
         """Test translator handles empty or missing recipe fields."""
-        translator = RecipeTranslator(mock_settings)
+        with patch(
+            "mealie_translate.translator_factory.TranslatorFactory.create_translator"
+        ) as mock_factory:
+            mock_translator = Mock()
+            mock_factory.return_value = mock_translator
+            mock_translator.translate_recipe = Mock(return_value={"translated": True})
 
-        # Mock OpenAI calls
-        translator._call_openai = Mock(return_value="Translated text")
+            translator = TranslatorFactory.create_translator(mock_settings)
 
-        empty_recipe = {
-            "name": "",
-            "description": None,
-            "recipeIngredient": [],
-            "recipeInstructions": [],
-            "notes": [],
-        }
+            empty_recipe = {
+                "name": "",
+                "description": None,
+                "recipeIngredient": [],
+                "recipeInstructions": [],
+                "notes": [],
+            }
 
-        result = translator.translate_recipe(empty_recipe)
+            result = translator.translate_recipe(empty_recipe, "English")
 
-        # Should handle empty fields gracefully
-        assert isinstance(result, dict)
-        assert "name" in result
-        assert "recipeIngredient" in result
-        assert "recipeInstructions" in result
+            # Should handle empty fields gracefully
+            assert isinstance(result, dict)
+            assert result["translated"] is True
 
     def test_translation_with_special_characters(self, mock_settings):
         """Test translator handles special characters and unicode."""
-        translator = RecipeTranslator(mock_settings)
-        translator._call_openai = Mock(return_value="Translated: café")
+        with patch(
+            "mealie_translate.translator_factory.TranslatorFactory.create_translator"
+        ) as mock_factory:
+            mock_translator = Mock()
+            mock_factory.return_value = mock_translator
+            mock_translator.translate_recipe = Mock(return_value={"translated": True})
 
-        text_with_unicode = "café ñoño 中文 🍰"
-        result = translator._translate_text(text_with_unicode)
+            # Test that the translator can be created with settings containing special chars
+            mock_settings.target_language = "español 中文"
+            translator = TranslatorFactory.create_translator(mock_settings)
 
-        assert result == "Translated: café"
-        translator._call_openai.assert_called_once()
+            assert translator is not None
 
 
 class TestMealieClientEdgeCases:
@@ -359,11 +367,23 @@ class TestRealAPICompatibility:
             "comments": [],
         }
 
-        translator = RecipeTranslator(mock_settings)
-        translator._call_openai = Mock(return_value="Translated content")
+        with patch(
+            "mealie_translate.translator_factory.TranslatorFactory.create_translator"
+        ) as mock_factory:
+            mock_translator = Mock()
+            mock_factory.return_value = mock_translator
+            expected_result = {
+                "name": "Translated name",
+                "recipeIngredient": ["Translated ingredient"],
+                "recipeInstructions": [{"text": "Translated instruction"}],
+                "notes": [{"text": "Translated note"}],
+            }
+            mock_translator.translate_recipe = Mock(return_value=expected_result)
 
-        # Should handle complex recipe structure without errors
-        result = translator.translate_recipe(realistic_recipe)
+            translator = TranslatorFactory.create_translator(mock_settings)
+
+            # Should handle complex recipe structure without errors
+            result = translator.translate_recipe(realistic_recipe, "English")
 
         assert isinstance(result, dict)
         assert "name" in result

@@ -151,3 +151,48 @@ def test_translate_notes(translator):
     assert len(result) == 2
     assert result[0]["title"] == "Translated: Note Title"
     assert result[0]["text"] == "Translated: Note content"
+
+
+def test_call_openai_gpt5_model_parameters(translator):
+    """Test that GPT-5 models use correct API parameters."""
+    # Mock the OpenAI client
+    mock_response = Mock()
+    mock_response.choices = [Mock()]
+    mock_response.choices[0].message.content = "Test response"
+
+    translator.client = Mock()
+    translator.client.chat.completions.create.return_value = mock_response
+
+    # Test GPT-5 model
+    result = translator._call_openai("Test prompt", "gpt-5")
+
+    # Verify the call was made with correct parameters for GPT-5
+    call_args = translator.client.chat.completions.create.call_args[1]
+    assert "max_completion_tokens" in call_args
+    assert call_args["max_completion_tokens"] == 2000
+    assert "temperature" not in call_args  # GPT-5 uses default temperature
+    assert "max_tokens" not in call_args  # GPT-5 doesn't use max_tokens
+    assert result == "Test response"
+
+
+def test_call_openai_gpt4_model_parameters(translator):
+    """Test that GPT-4 models use correct API parameters."""
+    # Mock the OpenAI client
+    mock_response = Mock()
+    mock_response.choices = [Mock()]
+    mock_response.choices[0].message.content = "Test response"
+
+    translator.client = Mock()
+    translator.client.chat.completions.create.return_value = mock_response
+
+    # Test GPT-4 model
+    result = translator._call_openai("Test prompt", "gpt-4o")
+
+    # Verify the call was made with correct parameters for GPT-4
+    call_args = translator.client.chat.completions.create.call_args[1]
+    assert "max_tokens" in call_args
+    assert call_args["max_tokens"] == 2000
+    assert "temperature" in call_args
+    assert call_args["temperature"] == 0.1
+    assert "max_completion_tokens" not in call_args
+    assert result == "Test response"
