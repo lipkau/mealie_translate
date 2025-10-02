@@ -58,6 +58,28 @@ def test_translate_text_with_unit_conversion(translator):
     assert "F or Fahrenheit to C" in prompt
 
 
+def test_unit_conversion_consistency(translator):
+    """Test that 1 cup conversions are consistent across ingredients."""
+    # Test that prompt explicitly shows consistent cup conversions
+    translator._call_openai = Mock(return_value="240 ml flour")
+
+    # Call the translation to trigger prompt generation
+    translator._translate_text("1 cup flour")
+
+    # Check the prompt includes the correct examples
+    call_args = translator._call_openai.call_args
+    prompt = call_args[0][0]
+
+    # Verify volumetric consistency examples are present
+    assert "1 cup = 240 ml for ALL ingredients" in prompt
+    assert '"1 cup flour" becomes "240 ml flour"' in prompt
+    assert '"1 cup sugar" becomes "240 ml sugar"' in prompt
+    assert "INGREDIENT-INDEPENDENT" in prompt
+
+    # Verify the UNIT_CONVERSION_RULES are correct
+    assert "1 cup = 240 ml (regardless of ingredient" in prompt
+
+
 def test_translate_recipe_structure(translator):
     """Test that translate_recipe maintains recipe structure."""
     original_recipe = {

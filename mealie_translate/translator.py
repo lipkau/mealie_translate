@@ -14,27 +14,35 @@ class RecipeTranslator:
     # Reusable prompt components
     UNIT_CONVERSION_RULES = """
 UNIT CONVERSION RULES:
-Convert ALL imperial units to metric equivalents and ROUND to the nearest multiple of 5:
+Convert ALL imperial units to metric equivalents and ROUND to the nearest multiple of 5.
+CRITICAL: Volume conversions are INGREDIENT-INDEPENDENT - use the same conversion for all ingredients.
 
-VOLUME CONVERSIONS:
-- cups to ml (1 cup = 240 ml, round to nearest 5 ml)
-- liquid ounces (fl oz) to ml (1 fl oz = 30 ml, round to nearest 5 ml)
-- gallons to ml (1 gallon = 3785 ml, round to nearest 5 ml)
-- tablespoons (tbsp) to ml (1 tbsp = 15 ml, already multiple of 5)
-- teaspoons (tsp) to ml (1 tsp = 5 ml, already multiple of 5)
-- pints to ml (1 pint = 473 ml, round to 475 ml)
-- quarts to ml (1 quart = 946 ml, round to 945 ml)
+VOLUME CONVERSIONS (INGREDIENT-INDEPENDENT):
+- cups to ml: 1 cup = 240 ml (regardless of ingredient - flour, sugar, water, etc.)
+- liquid ounces (fl oz) to ml: 1 fl oz = 30 ml
+- gallons to ml: 1 gallon = 3785 ml (round to nearest 5 ml)
+- tablespoons (tbsp) to ml: 1 tbsp = 15 ml (already multiple of 5)
+- teaspoons (tsp) to ml: 1 tsp = 5 ml (already multiple of 5)
+- pints to ml: 1 pint = 473 ml (round to 475 ml)
+- quarts to ml: 1 quart = 946 ml (round to 945 ml)
 
-MASS CONVERSIONS:
-- pounds (lbs) to g (1 lb = 454 g, round to 455 g)
-- ounces (oz) to g (1 oz = 28 g, round to 30 g)
-- stone to g (1 stone = 6350 g, already multiple of 5)
+MASS CONVERSIONS (INGREDIENT-INDEPENDENT):
+- pounds (lbs) to g: 1 lb = 454 g (round to 455 g)
+- ounces (oz) to g: 1 oz = 28 g (round to 30 g)
+- stone to g: 1 stone = 6350 g (already multiple of 5)
 
 TEMPERATURE CONVERSIONS:
-- F or Fahrenheit to C (C = (F - 32) x 5/9, round to nearest 5C)
+- F or Fahrenheit to C: C = (F - 32) × 5/9 (round to nearest 5°C)
+
+CRITICAL VOLUME CONVERSION EXAMPLES:
+- 1 cup flour = 240 ml flour (NOT 480 ml)
+- 1 cup sugar = 240 ml sugar (NOT 120 ml)
+- 1 cup water = 240 ml water
+- 2 cups flour = 480 ml flour
+- 1/2 cup oil = 120 ml oil
 
 ROUNDING EXAMPLES:
-- 227g becomes 225g, 454g becomes 455g, 163C becomes 165C, 175C stays 175C
+- 227g becomes 225g, 454g becomes 455g, 163°C becomes 165°C, 175°C stays 175°C
 - Always round to make measurements practical for home cooking
 """
 
@@ -121,13 +129,20 @@ Never add explanations, commentary, or modify the format of the response."""
         )
 
         conversion_examples = """
-Examples:
+VOLUME CONVERSION EXAMPLES (1 cup = 240 ml for ALL ingredients):
+- "1 cup flour" becomes "240 ml flour"
+- "1 cup sugar" becomes "240 ml sugar"
 - "2 cups flour" becomes "480 ml flour"
-- "1 pound butter" becomes "455 g butter"
-- "350F" becomes "175C"
+- "1/2 cup oil" becomes "120 ml oil"
 - "1 tablespoon oil" becomes "15 ml oil"
+
+MASS CONVERSION EXAMPLES:
+- "1 pound butter" becomes "455 g butter"
 - "8 ounces cream cheese" becomes "225 g cream cheese"
-- "325F" becomes "165C"
+
+TEMPERATURE CONVERSION EXAMPLES:
+- "350°F" becomes "175°C"
+- "325°F" becomes "165°C"
 """
 
         prompt = f"""
@@ -244,11 +259,15 @@ TRANSLATION RULES:
 """
 
         ingredient_examples = """
-Examples:
-- "1. 2 cups all-purpose flour" becomes "1. 480 ml all-purpose flour"
-- "2. 1 pound ground beef" becomes "2. 455 g ground beef"
-- "3. 1 tablespoon olive oil" becomes "3. 15 ml olive oil"
-- "4. 8 ounces cream cheese" becomes "4. 225 g cream cheese"
+VOLUME CONVERSION EXAMPLES (1 cup = 240 ml for ALL ingredients):
+- "1. 1 cup all-purpose flour" becomes "1. 240 ml all-purpose flour"
+- "2. 1 cup sugar" becomes "2. 240 ml sugar"
+- "3. 2 cups all-purpose flour" becomes "3. 480 ml all-purpose flour"
+- "4. 1 tablespoon olive oil" becomes "4. 15 ml olive oil"
+
+MASS CONVERSION EXAMPLES:
+- "5. 1 pound ground beef" becomes "5. 455 g ground beef"
+- "6. 8 ounces cream cheese" becomes "6. 225 g cream cheese"
 """
 
         prompt = f"""
@@ -381,13 +400,20 @@ Return the translations with unit conversions in the same numbered format:
         )
 
         conversion_examples = """
-Examples:
+VOLUME CONVERSION EXAMPLES (1 cup = 240 ml for ALL ingredients):
+- "1 cup flour" becomes "240 ml flour"
+- "1 cup sugar" becomes "240 ml sugar"
 - "2 cups flour" becomes "480 ml flour"
-- "1 pound butter" becomes "455 g butter"
-- "350F" becomes "175C"
+- "1/2 cup oil" becomes "120 ml oil"
 - "1 tablespoon oil" becomes "15 ml oil"
+
+MASS CONVERSION EXAMPLES:
+- "1 pound butter" becomes "455 g butter"
 - "8 ounces cream cheese" becomes "225 g cream cheese"
-- "325F" becomes "165C"
+
+TEMPERATURE CONVERSION EXAMPLES:
+- "350°F" becomes "175°C"
+- "325°F" becomes "165°C"
 """
 
         prompt = f"""
