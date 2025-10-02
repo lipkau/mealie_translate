@@ -17,19 +17,12 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python main.py                           # Process all unprocessed recipes
-  python main.py --recipe my-recipe-slug   # Process a specific recipe
-  python main.py --dry-run                 # Show what would be processed
+  python main.py                        # Process all unprocessed recipes
+  python main.py --recipe my-recipe-slug # Process a specific recipe
         """,
     )
 
     parser.add_argument("--recipe", type=str, help="Process a specific recipe by slug")
-
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Show what would be processed without making changes",
-    )
 
     parser.add_argument(
         "--config",
@@ -65,10 +58,6 @@ Examples:
         if args.recipe:
             # Process specific recipe
             logger.info(f"Processing specific recipe: {args.recipe}")
-            if args.dry_run:
-                logger.info("DRY RUN: Would process recipe - no changes will be made")
-                return 0
-
             result = processor.process_single_recipe(args.recipe)
             if result:
                 logger.info(f"Successfully processed recipe: {args.recipe}")
@@ -78,12 +67,6 @@ Examples:
         else:
             # Process all unprocessed recipes
             logger.info("Starting to process all unprocessed recipes")
-            if args.dry_run:
-                logger.info(
-                    "DRY RUN: Would process all recipes - no changes will be made"
-                )
-                return 0
-
             results = processor.process_all_recipes()
 
             logger.info(f"Processing complete. Results: {results}")

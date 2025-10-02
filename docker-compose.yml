@@ -13,7 +13,6 @@ services:
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
       TARGET_LANGUAGE: ${TARGET_LANGUAGE:-German}
       BATCH_SIZE: ${BATCH_SIZE:-5}
-      DRY_RUN: ${DRY_RUN:-false}
       CRON_SCHEDULE: ${CRON_SCHEDULE:-0 */6 * * *}
     env_file:
       - .env
@@ -36,7 +35,6 @@ services:
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
       TARGET_LANGUAGE: ${TARGET_LANGUAGE:-German}
       BATCH_SIZE: ${BATCH_SIZE:-5}
-      DRY_RUN: ${DRY_RUN:-true}
       CRON_SCHEDULE: ${CRON_SCHEDULE:-*/30 * * * *}
     env_file:
       - .env

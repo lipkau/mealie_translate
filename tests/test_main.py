@@ -29,7 +29,6 @@ def test_main_missing_config(mock_parse_args, mock_processor_class, mock_get_set
     # Mock command line arguments
     mock_args = Mock()
     mock_args.recipe = None
-    mock_args.dry_run = False
     mock_args.config = None
     mock_parse_args.return_value = mock_args
 
@@ -45,35 +44,11 @@ def test_main_missing_config(mock_parse_args, mock_processor_class, mock_get_set
 @patch("mealie_translate.main.get_settings")
 @patch("mealie_translate.main.RecipeProcessor")
 @patch("mealie_translate.main.argparse.ArgumentParser.parse_args")
-def test_main_dry_run(mock_parse_args, mock_processor_class, mock_get_settings):
-    """Test main function with dry run flag."""
-    # Mock command line arguments
-    mock_args = Mock()
-    mock_args.recipe = None
-    mock_args.dry_run = True
-    mock_args.config = None
-    mock_parse_args.return_value = mock_args
-
-    # Mock settings with valid config
-    mock_settings = Mock()
-    mock_settings.mealie_base_url = "https://test.com"
-    mock_settings.openai_api_key = "test-key"
-    mock_settings.mealie_api_token = "test-token"
-    mock_get_settings.return_value = mock_settings
-
-    result = main()
-    assert result == 0
-
-
-@patch("mealie_translate.main.get_settings")
-@patch("mealie_translate.main.RecipeProcessor")
-@patch("mealie_translate.main.argparse.ArgumentParser.parse_args")
 def test_main_single_recipe(mock_parse_args, mock_processor_class, mock_get_settings):
     """Test main function with single recipe processing."""
     # Mock command line arguments
     mock_args = Mock()
     mock_args.recipe = "test-recipe"
-    mock_args.dry_run = False
     mock_args.config = None
     mock_parse_args.return_value = mock_args
 
@@ -102,7 +77,6 @@ def test_main_all_recipes(mock_parse_args, mock_processor_class, mock_get_settin
     # Mock command line arguments
     mock_args = Mock()
     mock_args.recipe = None
-    mock_args.dry_run = False
     mock_args.config = None
     mock_parse_args.return_value = mock_args
 
