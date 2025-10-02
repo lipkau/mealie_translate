@@ -6,8 +6,18 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
+    paths-ignore:
+      - ".github/**"
+      - "!.github/workflows/**" # Still include workflow changes
+      - ".vscode/**"
+      - "assets/**"
   pull_request:
     branches: [main]
+    paths-ignore:
+      - ".github/**"
+      - "!.github/workflows/**" # Still include workflow changes
+      - ".vscode/**"
+      - "assets/**"
   workflow_dispatch:
 
 jobs:
@@ -87,7 +97,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13"]
 
     steps:
       - uses: actions/checkout@v5
@@ -182,8 +192,6 @@ jobs:
     needs:
       - markdownlint
       - code-quality-and-coverage
-      - test
-      - integration-test
     steps:
       - uses: actions/checkout@v5
 

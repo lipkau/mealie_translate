@@ -20,6 +20,7 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
+.mypy_cache/
 
 # Virtual Environment
 .venv/

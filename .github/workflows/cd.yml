@@ -38,30 +38,64 @@ jobs:
         id: find_tag
         run: |
           TAG=$(git tag --points-at ${{ github.event.workflow_run.head_sha }} | grep -E '^v[0-9]' | head -n1 || true)
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
 
-      # Build and push dev image (development target) for main branch
+          # Sanitize tag for Docker compatibility
+          if [[ -n "$TAG" ]]; then
+            # Convert to lowercase and replace invalid characters
+            DOCKER_TAG=$(echo "$TAG" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9._-]/-/g' | sed 's/^[-.]*//' | sed 's/[-._]*$//')
+
+            # Skip if sanitization resulted in empty string
+            if [[ -z "$DOCKER_TAG" ]]; then
+              echo "Warning: Tag '$TAG' is invalid for Docker (sanitization resulted in empty string)"
+              echo "Skipping Docker build for this tag"
+              echo "tag=" >> $GITHUB_OUTPUT
+            else
+              echo "Original tag: $TAG"
+              echo "Docker tag: $DOCKER_TAG"
+              echo "tag=$DOCKER_TAG" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "tag=" >> $GITHUB_OUTPUT
+          fi
+
+      # Prepare dev image tags
+      - name: Prepare dev image tags
+        id: dev_tags
+        run: |
+          if [[ "${{ github.event.workflow_run.head_branch }}" == "main" ]]; then
+            echo "Building dev image for main branch"
+            TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev"
+          elif [[ "${{ steps.find_tag.outputs.tag }}" != "" ]]; then
+            echo "Building dev image for PR tag: ${{ steps.find_tag.outputs.tag }}"
+            TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.find_tag.outputs.tag }}"
+          else
+          echo "No dev image needed for this scenario"
+            TAGS=""
+          fi
+          echo "tags=$TAGS" >> $GITHUB_OUTPUT
+
+      # Build and push dev image (development target)
       - name: Build and push dev image
-        if: ${{ github.event.workflow_run.head_branch == 'main' }}
+        if: ${{ steps.dev_tags.outputs.tags != '' }}
         uses: docker/build-push-action@v6
         with:
           context: .
           target: development
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev
+          tags: ${{ steps.dev_tags.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Build and push prod image (production target) for v* tags
+      # Build and push prod image (production target) for main branch tags only
       - name: Build and push prod image
-        if: ${{ steps.find_tag.outputs.tag != '' }}
+        if: ${{ steps.find_tag.outputs.tag != '' && github.event.workflow_run.head_branch == 'main' }}
         uses: docker/build-push-action@v6
         with:
           context: .
           target: production
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.find_tag.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
