@@ -1,0 +1,137 @@
+name: Maintenance
+
+on:
+  schedule:
+    # Run every day at 2 AM UTC
+    - cron: "0 2 * * *"
+  workflow_dispatch: # Allow manual trigger
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  cleanup-old-images:
+    name: Cleanup Old Development Images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Delete dev images older than 7 days (keep recent ones for debugging)
+      - name: Delete old dev images
+        run: |
+          echo "🧹 Starting scheduled cleanup of old development images..."
+
+          # Extract repository name from full repository path
+          REPO_NAME="${{ github.event.repository.name }}"
+          echo "Repository: ${{ github.repository_owner }}/$REPO_NAME"
+
+          # Check if any container packages exist for this organization
+          echo "Checking if container packages exist..."
+          PACKAGES_RESPONSE=$(gh api -H "Accept: application/vnd.github.v3+json" \
+            "/orgs/${{ github.repository_owner }}/packages?package_type=container" 2>/dev/null || echo "[]")
+
+          if [[ "$PACKAGES_RESPONSE" == "[]" ]] || [[ -z "$PACKAGES_RESPONSE" ]]; then
+            echo "ℹ️  No container packages found for this organization yet"
+            echo "This is normal if no Docker images have been published through CI/CD"
+            exit 0
+          fi
+
+          # Filter for packages matching this repository name
+          REPO_PACKAGES=$(echo "$PACKAGES_RESPONSE" | jq -r --arg repo "$REPO_NAME" '.[] | select(.name == $repo) | .name' || echo "")
+
+          if [[ -z "$REPO_PACKAGES" ]]; then
+            echo "ℹ️  No container packages found for repository '$REPO_NAME'"
+            echo "This is normal if Docker images haven't been published for this repository yet"
+            exit 0
+          fi
+
+          # Get all package versions (images) for this repository
+          echo "Fetching package versions..."
+          PACKAGES_JSON=$(gh api -H "Accept: application/vnd.github.v3+json" \
+            "/orgs/${{ github.repository_owner }}/packages/container/$REPO_NAME/versions?per_page=100" 2>/dev/null || echo "[]")
+
+          if [[ "$PACKAGES_JSON" == "[]" ]]; then
+            echo "ℹ️  No package versions found"
+            exit 0
+          fi
+
+          # Filter for development images
+          PACKAGES=$(echo "$PACKAGES_JSON" | jq -c '.[] | select(.metadata.container.tags[]? | test("^(dev|pr-.*-dev)$")) | {id: .id, tags: .metadata.container.tags, created: .created_at}')
+
+          if [[ -z "$PACKAGES" ]]; then
+            echo "ℹ️  No development images found"
+            exit 0
+          fi
+
+          # Calculate cutoff date (7 days ago)
+          CUTOFF_DATE=$(date -d '7 days ago' -u +%Y-%m-%dT%H:%M:%SZ)
+
+          echo "Cutoff date: $CUTOFF_DATE"
+          echo "Found development images:"
+          echo "$PACKAGES" | jq -r '. | "ID: \(.id), Tags: \(.tags | join(", ")), Created: \(.created)"'
+
+          # Delete images older than cutoff
+          OLD_IMAGES=$(echo "$PACKAGES" | jq -r --arg cutoff "$CUTOFF_DATE" 'select(.created < $cutoff) | .id')
+
+          if [[ -z "$OLD_IMAGES" ]]; then
+            echo "✅ No old development images found to delete"
+          else
+            echo "🗑️  Deleting old development images:"
+            DELETED_COUNT=0
+            for IMAGE_ID in $OLD_IMAGES; do
+              echo "Deleting image ID: $IMAGE_ID"
+              if gh api --method DELETE -H "Accept: application/vnd.github.v3+json" \
+                "/orgs/${{ github.repository_owner }}/packages/container/$REPO_NAME/versions/$IMAGE_ID" 2>/dev/null; then
+                ((DELETED_COUNT++))
+                echo "✅ Successfully deleted image ID: $IMAGE_ID"
+              else
+                echo "⚠️  Failed to delete image ID: $IMAGE_ID"
+              fi
+            done
+            echo "✅ Cleanup completed - deleted $DELETED_COUNT images"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  maintenance-summary:
+    name: Maintenance Summary
+    runs-on: ubuntu-latest
+    needs: [cleanup-old-images]
+    if: always()
+    steps:
+      - name: Generate Maintenance Report
+        run: |
+          echo "# 🧹 Maintenance Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Task | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          # Cleanup status
+          if [[ "${{ needs.cleanup-old-images.result }}" == "success" ]]; then
+            echo "| Image Cleanup | ✅ Success |" >> $GITHUB_STEP_SUMMARY
+          elif [[ "${{ needs.cleanup-old-images.result }}" == "failure" ]]; then
+            echo "| Image Cleanup | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Image Cleanup | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📊 Maintenance Information" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Registry**: \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Run Time**: $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Workflow Run**: #${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🕐 Schedule" >> $GITHUB_STEP_SUMMARY
+          echo "This maintenance pipeline runs daily at 2 AM UTC to keep the container registry clean." >> $GITHUB_STEP_SUMMARY
+          echo "Development images older than 7 days are automatically removed." >> $GITHUB_STEP_SUMMARY

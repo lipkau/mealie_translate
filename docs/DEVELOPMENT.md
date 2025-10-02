@@ -252,14 +252,12 @@ MEALIE_API_TOKEN=your_mealie_token
 # Application Configuration
 TARGET_LANGUAGE=German
 LOG_LEVEL=INFO
-DRY_RUN=false
 MAX_RETRIES=3
 DELAY_BETWEEN_REQUESTS=1.0
 ```
 
 ### Development vs Production
 
-- **Development**: Use `DRY_RUN=true` to test without making changes
 - **Testing**: Integration tests require real API keys
 - **Production**: Use environment-specific configuration
 

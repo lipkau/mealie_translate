@@ -34,7 +34,7 @@ Our Docker build strategy creates two types of images based on context:
 | Production release   | main   | ✅           | ✅           | production  | `ghcr.io/lipkau/mealie_translate:v1.2.3`          |
 | Regular PR           | PR     | ❌           | ❌           | -           | -                                                 |
 
-## � Build Scenarios
+## 📋 Build Scenarios
 
 ### 1. **Development Workflow** (Main Branch)
 
@@ -105,7 +105,7 @@ Git tags are automatically sanitized for Docker compatibility:
 - Replace `+` with `-` (e.g., `v1.0.0+build` → `v1.0.0-build`)
 - Skip tags with spaces or invalid characters
 
-## � Implementation Details
+## 🔧 Implementation Details
 
 ### Dockerfile Targets
 
@@ -129,7 +129,7 @@ image_type: ${{ github.ref == 'refs/heads/main' && 'production' || 'development'
 docker build --target ${{ steps.determine.outputs.image_type }}
 ```
 
-## � Usage Examples
+## 🚀 Usage Examples
 
 ### Testing a Feature Branch
 
@@ -189,7 +189,33 @@ git push origin tag v2.0.0
 2. Avoid spaces, slashes (except in branch names), and special characters
 3. Check CD workflow logs for sanitization details
 
-## � Related Documentation
+## 🧹 Image Maintenance
+
+### Automated Cleanup
+
+Development images are automatically cleaned up to prevent registry bloat:
+
+- **Schedule**: Daily at 2 AM UTC via dedicated maintenance pipeline
+- **Retention**: Development images older than 7 days are automatically removed
+- **Scope**: Only affects development images (tags matching `dev` or `pr-*-dev`)
+- **Production Images**: Never automatically deleted (manual cleanup only)
+
+### Manual Cleanup
+
+To manually trigger image cleanup:
+
+```bash
+# Trigger the maintenance workflow manually
+gh workflow run maintenance.yml
+```
+
+### Monitoring Cleanup
+
+- Check the maintenance pipeline runs in GitHub Actions
+- Review cleanup summaries in workflow step summaries
+- Failed deletions are logged but don't stop the pipeline
+
+## 📚 Related Documentation
 
 - [CI/CD Architecture](CI_CD_ARCHITECTURE.md): Complete pipeline overview
 - [Development Guide](DEVELOPMENT.md): Local development setup
