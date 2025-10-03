@@ -13,7 +13,7 @@ This is a **mature, production-ready project** with comprehensive tooling:
 - **CI/CD**: Separated 3-workflow architecture (CI → CD → Security)
 - **Deployment**: Docker containers published to GitHub Container Registry (GHCR)
 - **Development**: 35+ Makefile commands, pre-commit hooks, comprehensive testing
-- **Documentation**: 15+ detailed docs covering all aspects
+- **Documentation**: 7 detailed docs covering all aspects
 
 ## 🔑 Key Components
 
@@ -58,6 +58,7 @@ make run            # Run the application
 - **Testing**: `pytest` with both unit and integration tests
 - **Security**: `bandit` + `pip-audit` for vulnerability scanning
 - **Type hints**: Required for all public functions
+- **Logging**: Use structured logging via `get_logger(__name__)` - NO print statements in production code
 
 ### Documentation
 
@@ -102,9 +103,10 @@ Use the make lint-all command to check code quality.
 
 1. **Always use the Makefile**: `make test-unit`, `make format`, `make lint-all`
 2. **Follow existing patterns**: Look at existing code for structure
-3. **Add tests**: Unit tests in `tests/`, follow existing patterns
-4. **Update docs**: If changing behavior, update relevant documentation
-5. **Test your changes**: Run all tests locally before pushing
+3. **Use proper logging**: Import `get_logger(__name__)` and use `logger.info/debug/warning/error()` instead of print statements
+4. **Add tests**: Unit tests in `tests/`, follow existing patterns
+5. **Update docs**: If changing behavior, update relevant documentation
+6. **Test your changes**: Run all tests locally before pushing
 
 ### When Writing Documentation
 
@@ -132,6 +134,7 @@ Use the make lint-all command to check code quality.
 - **Complete command reference**: `make help`
 - **Development guide**: `docs/DEVELOPMENT.md`
 - **Docker deployment**: `docs/DOCKER.md`
+- **Docker image strategy**: `docs/DOCKER_IMAGE_STRATEGY.md`
 - **CI/CD architecture**: `docs/CI_CD_ARCHITECTURE.md`
 - **Security architecture**: `docs/SECURITY_ARCHITECTURE.md`
 

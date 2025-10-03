@@ -17,6 +17,7 @@ This directory contains all project documentation for the Mealie Recipe Translat
 ## Architecture & Security
 
 - **[CI/CD Architecture](CI_CD_ARCHITECTURE.md)** - Separated pipeline design and deployment workflow
+- **[Docker Image Strategy](DOCKER_IMAGE_STRATEGY.md)** - Development vs production image build strategy and decision matrix
 - **[Security Architecture](SECURITY_ARCHITECTURE.md)** - Multi-layered security scanning and tool migration history
 - **[Artifacts Documentation](ARTIFACTS.md)** - CI/CD pipeline artifacts and retention policies
 
@@ -56,6 +57,7 @@ docs/
 ├── README.md                    # This file - documentation index
 ├── DEVELOPMENT.md               # Complete developer guide (commands, tools, optimizations)
 ├── DOCKER.md                    # Complete Docker guide (deployment, scheduling, registry)
+├── DOCKER_IMAGE_STRATEGY.md    # Development vs production image build strategy
 ├── CI_CD_ARCHITECTURE.md       # Separated pipeline architecture
 ├── SECURITY_ARCHITECTURE.md    # Multi-layered security scanning and tool migration history
 └── ARTIFACTS.md                # CI/CD pipeline artifacts

@@ -4,6 +4,7 @@ import time
 from typing import Any
 
 from .config import Settings, get_settings
+from .logger import get_logger
 from .mealie_client import MealieClient
 from .translator import RecipeTranslator
 
@@ -21,6 +22,7 @@ class RecipeProcessor:
         self.settings = settings or get_settings()
         self.mealie_client = MealieClient(self.settings)
         self.translator = RecipeTranslator(self.settings)
+        self.logger = get_logger(__name__)
 
     def process_all_recipes(self) -> dict[str, int]:
         """Process all recipes in the Mealie server.
@@ -28,14 +30,14 @@ class RecipeProcessor:
         Returns:
             Dictionary with processing statistics
         """
-        print("Starting recipe translation process...")
+        self.logger.info("Starting recipe translation process...")
 
         # Get all recipes
-        print("Fetching all recipes from Mealie server...")
+        self.logger.info("Fetching all recipes from Mealie server...")
         all_recipes = self.mealie_client.get_all_recipes()
 
         if not all_recipes:
-            print("No recipes found!")
+            self.logger.warning("No recipes found!")
             return {
                 "total_recipes": 0,
                 "processed": 0,
@@ -55,13 +57,13 @@ class RecipeProcessor:
                 ):
                     unprocessed_recipes.append(recipe)
                 elif full_recipe:
-                    print(
+                    self.logger.debug(
                         "Skipping already processed recipe: "
                         f"{full_recipe.get('name', 'Unknown')}"
                     )
 
         if not unprocessed_recipes:
-            print("No unprocessed recipes found!")
+            self.logger.info("No unprocessed recipes found!")
             return {
                 "total_recipes": len(all_recipes),
                 "processed": 0,
@@ -69,7 +71,9 @@ class RecipeProcessor:
                 "failed": 0,
             }
 
-        print(f"Found {len(unprocessed_recipes)} unprocessed recipes to translate")
+        self.logger.info(
+            f"Found {len(unprocessed_recipes)} unprocessed recipes to translate"
+        )
 
         # Process recipes in batches
         stats = {
@@ -87,8 +91,8 @@ class RecipeProcessor:
             end_idx = start_idx + batch_size
             batch = unprocessed_recipes[start_idx:end_idx]
 
-            print(
-                f"\nProcessing batch {batch_num + 1}/{total_batches} "
+            self.logger.info(
+                f"Processing batch {batch_num + 1}/{total_batches} "
                 f"({len(batch)} recipes)..."
             )
 
@@ -99,7 +103,7 @@ class RecipeProcessor:
                 stats[key] += batch_stats[key]
 
             remaining = stats["total_recipes"] - stats["processed"] - stats["failed"]
-            print(
+            self.logger.info(
                 "Batch complete. "
                 f"Processed: {stats['processed']}, "
                 f"Failed: {stats['failed']}, "
@@ -110,7 +114,9 @@ class RecipeProcessor:
             if batch_num < total_batches - 1:
                 time.sleep(2)
 
-        print(f"\nTranslation complete! Processed {stats['processed']} recipes.")
+        self.logger.info(
+            f"Translation complete! Processed {stats['processed']} recipes."
+        )
         return stats
 
     def process_single_recipe(self, recipe_slug: str) -> bool:
@@ -122,18 +128,18 @@ class RecipeProcessor:
         Returns:
             True if processing successful, False otherwise
         """
-        print(f"Processing single recipe: {recipe_slug}")
+        self.logger.info(f"Processing single recipe: {recipe_slug}")
 
         try:
             # Get the recipe details
             recipe = self.mealie_client.get_recipe_details(recipe_slug)
             if not recipe:
-                print(f"Recipe not found: {recipe_slug}")
+                self.logger.error(f"Recipe not found: {recipe_slug}")
                 return False
 
             # Check if already processed
             if self.mealie_client.is_recipe_processed(recipe):
-                print(
+                self.logger.info(
                     f"Recipe {recipe_slug} is already processed "
                     "(has 'translated' in extras)"
                 )
@@ -145,19 +151,21 @@ class RecipeProcessor:
             # Update the recipe
             success = self.mealie_client.update_recipe(recipe_slug, translated_recipe)
             if not success:
-                print(f"Failed to update recipe: {recipe_slug}")
+                self.logger.error(f"Failed to update recipe: {recipe_slug}")
                 return False
 
             # Mark as processed
             mark_success = self.mealie_client.mark_recipe_as_processed(recipe_slug)
             if not mark_success:
-                print(f"Warning: Failed to mark recipe as processed: {recipe_slug}")
+                self.logger.warning(
+                    f"Failed to mark recipe as processed: {recipe_slug}"
+                )
 
-            print(f"Successfully processed recipe: {recipe_slug}")
+            self.logger.info(f"Successfully processed recipe: {recipe_slug}")
             return True
 
         except Exception as e:
-            print(f"Error processing recipe {recipe_slug}: {e}")
+            self.logger.error(f"Error processing recipe {recipe_slug}: {e}")
             return False
 
     def _filter_unprocessed_recipes(
@@ -191,7 +199,7 @@ class RecipeProcessor:
         for recipe in recipes:
             recipe_slug = recipe.get("slug") or recipe.get("id")
             if not recipe_slug:
-                print("Warning: Recipe missing slug/id, skipping")
+                self.logger.warning("Recipe missing slug/id, skipping")
                 stats["skipped"] += 1
                 continue
 
@@ -199,13 +207,17 @@ class RecipeProcessor:
                 # Get full recipe details
                 full_recipe = self.mealie_client.get_recipe_details(recipe_slug)
                 if not full_recipe:
-                    print(f"Failed to fetch details for recipe: {recipe_slug}")
+                    self.logger.error(
+                        f"Failed to fetch details for recipe: {recipe_slug}"
+                    )
                     stats["failed"] += 1
                     continue
 
                 # Check if already processed (double-check)
                 if self.mealie_client.is_recipe_processed(full_recipe):
-                    print(f"Recipe {recipe_slug} already processed, skipping")
+                    self.logger.debug(
+                        f"Recipe {recipe_slug} already processed, skipping"
+                    )
                     stats["skipped"] += 1
                     continue
 
@@ -217,17 +229,19 @@ class RecipeProcessor:
                     recipe_slug, translated_recipe
                 )
                 if not success:
-                    print(f"Failed to update recipe: {recipe_slug}")
+                    self.logger.error(f"Failed to update recipe: {recipe_slug}")
                     stats["failed"] += 1
                     continue
 
                 # Mark as processed
                 mark_success = self.mealie_client.mark_recipe_as_processed(recipe_slug)
                 if not mark_success:
-                    print(f"Warning: Failed to mark recipe as processed: {recipe_slug}")
+                    self.logger.warning(
+                        f"Failed to mark recipe as processed: {recipe_slug}"
+                    )
 
                 stats["processed"] += 1
-                print(
+                self.logger.info(
                     "Successfully processed: "
                     f"{translated_recipe.get('name', recipe_slug)}"
                 )
@@ -236,7 +250,7 @@ class RecipeProcessor:
                 time.sleep(1)
 
             except Exception as e:
-                print(f"Error processing recipe {recipe_slug}: {e}")
+                self.logger.error(f"Error processing recipe {recipe_slug}: {e}")
                 stats["failed"] += 1
 
         return stats

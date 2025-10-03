@@ -7,6 +7,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from .config import Settings
+from .logger import get_logger
 
 
 class MealieClient:
@@ -21,6 +22,7 @@ class MealieClient:
         self.base_url = settings.mealie_base_url
         self.api_token = settings.mealie_api_token
         self.session = self._create_session()
+        self.logger = get_logger(__name__)
 
     def _create_session(self) -> requests.Session:
         """Create a requests session with retry strategy."""
@@ -64,7 +66,9 @@ class MealieClient:
         page = 1
         per_page = 50
 
-        print(f"Fetching recipes from Mealie API: {self.base_url}/api/recipes")
+        self.logger.info(
+            f"Fetching recipes from Mealie API: {self.base_url}/api/recipes"
+        )
 
         while True:
             url = f"{self.base_url}/api/recipes"
@@ -103,10 +107,10 @@ class MealieClient:
                 page += 1
 
             except requests.RequestException as e:
-                print(f"Error fetching recipes page {page}: {e}")
+                self.logger.error(f"Error fetching recipes page {page}: {e}")
                 raise
 
-        print(f"Found {len(recipes)} recipes total")
+        self.logger.info(f"Found {len(recipes)} recipes total")
         return recipes
 
     def get_recipe_details(self, recipe_slug: str) -> dict[str, Any] | None:
@@ -122,24 +126,28 @@ class MealieClient:
             requests.RequestException: If API request fails
         """
         url = f"{self.base_url}/api/recipes/{recipe_slug}"
-        print(f"Fetching recipe details: {url}")
+        self.logger.debug(f"Fetching recipe details: {url}")
 
         try:
             response = self.session.get(url, timeout=30)
             response.raise_for_status()
             recipe_data: dict[str, Any] = response.json()
-            print(f"Successfully fetched recipe: {recipe_data.get('name', 'Unknown')}")
+            self.logger.debug(
+                f"Successfully fetched recipe: {recipe_data.get('name', 'Unknown')}"
+            )
             return recipe_data
 
         except requests.HTTPError as e:
             if hasattr(e, "response") and e.response.status_code == 404:
-                print(f"Recipe not found: {recipe_slug}")
+                self.logger.warning(f"Recipe not found: {recipe_slug}")
                 return None
             else:
-                print(f"HTTP error fetching recipe details for {recipe_slug}: {e}")
+                self.logger.error(
+                    f"HTTP error fetching recipe details for {recipe_slug}: {e}"
+                )
                 raise
         except requests.RequestException as e:
-            print(f"Error fetching recipe details for {recipe_slug}: {e}")
+            self.logger.error(f"Error fetching recipe details for {recipe_slug}: {e}")
             raise
 
     def update_recipe(self, recipe_slug: str, recipe_data: dict[str, Any]) -> bool:
@@ -156,29 +164,31 @@ class MealieClient:
             requests.RequestException: If API request fails
         """
         url = f"{self.base_url}/api/recipes/{recipe_slug}"
-        print(f"Updating recipe: {url}")
+        self.logger.debug(f"Updating recipe: {url}")
 
         try:
             # Send the complete recipe object as-is
             # Mealie expects all fields to be present during updates
-            print(f"Sending update for recipe: {recipe_data.get('name', 'Unknown')}")
+            self.logger.debug(
+                f"Sending update for recipe: {recipe_data.get('name', 'Unknown')}"
+            )
 
             response = self.session.put(
                 url, json=recipe_data, timeout=60
             )  # Increased timeout for larger updates
             response.raise_for_status()
-            print(f"Successfully updated recipe: {recipe_slug}")
+            self.logger.info(f"Successfully updated recipe: {recipe_slug}")
             return True
 
         except requests.RequestException as e:
-            print(f"Error updating recipe {recipe_slug}: {e}")
+            self.logger.error(f"Error updating recipe {recipe_slug}: {e}")
             if hasattr(e, "response") and e.response:
                 try:
                     error_detail = e.response.json()
-                    print(f"API error details: {error_detail}")
+                    self.logger.error(f"API error details: {error_detail}")
                 except (ValueError, AttributeError):
-                    print(f"Response status: {e.response.status_code}")
-                    print(f"Response text: {e.response.text[:500]}")
+                    self.logger.error(f"Response status: {e.response.status_code}")
+                    self.logger.error(f"Response text: {e.response.text[:500]}")
             raise
 
     def mark_recipe_as_processed(self, recipe_slug: str) -> bool:
@@ -209,7 +219,7 @@ class MealieClient:
             return self.update_recipe(recipe_slug, recipe)
 
         except Exception as e:
-            print(f"Error marking recipe {recipe_slug} as processed: {e}")
+            self.logger.error(f"Error marking recipe {recipe_slug} as processed: {e}")
             return False
 
     def is_recipe_processed(self, recipe: dict[str, Any]) -> bool:

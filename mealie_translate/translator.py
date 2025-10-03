@@ -6,6 +6,7 @@ from typing import Any
 from openai import OpenAI
 
 from .config import Settings
+from .logger import get_logger
 
 
 class RecipeTranslator:
@@ -70,6 +71,7 @@ Never add explanations, commentary, or modify the format of the response."""
         self.max_retries = settings.max_retries
         self.retry_delay = settings.retry_delay
         self.model = settings.openai_model
+        self.logger = get_logger(__name__)
 
     def translate_recipe(self, recipe: dict[str, Any]) -> dict[str, Any]:
         """Translate a complete recipe to the target language.
@@ -366,7 +368,7 @@ Return the translations with unit conversions in the same numbered format:
                 return content.strip() if content else ""
 
             except Exception as e:
-                print(
+                self.logger.warning(
                     f"OpenAI API error (attempt {attempt + 1}/{self.max_retries}): {e}"
                 )
 
