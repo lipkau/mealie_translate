@@ -269,6 +269,80 @@ jobs:
           sarif_file: "trivy-results-latest.sarif"
           category: "docker-latest"
 
+  docker-scout-scan:
+    name: Docker Scout Security Analysis
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event_name == 'schedule') ||
+      (github.event_name == 'workflow_run' && needs.check-cd-status.outputs.should-scan == 'true')
+    needs: [check-cd-status]
+    continue-on-error: true # Don't fail the whole pipeline if Scout has issues
+
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+      pull-requests: write # For PR comments
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check if latest image exists for Scout scan
+        id: scout-image-check
+        run: |
+          if docker manifest inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest > /dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "✅ Image latest exists for Scout scan"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "⚠️ Image latest does not exist, skipping Scout scan"
+          fi
+
+      - name: Docker Scout CVE Analysis
+        if: steps.scout-image-check.outputs.exists == 'true'
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          sarif-file: docker-scout-cves.sarif
+          summary: true
+
+      - name: Docker Scout Policy Evaluation
+        if: steps.scout-image-check.outputs.exists == 'true'
+        uses: docker/scout-action@v1
+        with:
+          command: policy
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          exit-code: false # Don't fail on policy violations, just report
+
+      - name: Docker Scout SBOM Generation
+        if: steps.scout-image-check.outputs.exists == 'true'
+        uses: docker/scout-action@v1
+        with:
+          command: sbom
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          format: json
+          output: docker-scout-sbom.json
+
+      - name: Upload Scout CVE results to GitHub Security tab
+        if: steps.scout-image-check.outputs.exists == 'true'
+        uses: github/codeql-action/upload-sarif@v3
+        continue-on-error: true
+        with:
+          sarif_file: docker-scout-cves.sarif
+          category: "docker-scout"
+
+      - name: Upload Scout artifacts
+        if: steps.scout-image-check.outputs.exists == 'true' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-scout-results
+          path: |
+            docker-scout-*.sarif
+            docker-scout-*.json
+          retention-days: 30
+
   security-summary:
     name: Security Summary
     runs-on: ubuntu-latest
@@ -278,6 +352,7 @@ jobs:
         python-security-scan,
         docker-security-scan-dev,
         docker-security-scan-latest,
+        docker-scout-scan,
       ]
     if: always() && (needs.python-security-scan.result != 'skipped' || needs.docker-security-scan-dev.result != 'skipped' || needs.docker-security-scan-latest.result != 'skipped')
     permissions:
@@ -305,11 +380,22 @@ jobs:
           # Docker security status
           dev_result="${{ needs.docker-security-scan-dev.result }}"
           latest_result="${{ needs.docker-security-scan-latest.result }}"
+          scout_result="${{ needs.docker-scout-scan.result }}"
 
           if [ "$dev_result" == "success" ] || [ "$latest_result" == "success" ]; then
-            echo "✅ **Docker Security Scan:** Passed" >> $GITHUB_STEP_SUMMARY
+            echo "✅ **Docker Security Scan (Trivy):** Passed" >> $GITHUB_STEP_SUMMARY
           else
-            echo "❌ **Docker Security Scan:** Failed" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **Docker Security Scan (Trivy):** Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "$scout_result" == "success" ]; then
+            echo "✅ **Docker Security Scan (Scout):** Passed" >> $GITHUB_STEP_SUMMARY
+          elif [ "$scout_result" == "failure" ]; then
+            echo "❌ **Docker Security Scan (Scout):** Failed" >> $GITHUB_STEP_SUMMARY
+          elif [ "$scout_result" == "skipped" ]; then
+            echo "⏭️ **Docker Security Scan (Scout):** Skipped" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **Docker Security Scan (Scout):** $scout_result" >> $GITHUB_STEP_SUMMARY
           fi
 
           echo "" >> $GITHUB_STEP_SUMMARY
