@@ -1,4 +1,4 @@
-.PHONY: help setup setup-full setup-env install install-dev test test-unit test-integration test-coverage lint lint-format lint-markdown lint-all lint-no-markdown format pre-commit pre-commit-force pre-commit-uninstall clean clean-all run compare-models compare-models-basic verify-prompts docker-build docker-run docker-dev docker-test docker-clean security-scan security-bandit security-pip-audit
+.PHONY: help setup setup-full setup-env install install-dev test test-unit test-integration test-coverage lint lint-format lint-markdown lint-all lint-no-markdown format check pre-commit pre-commit-force pre-commit-uninstall clean clean-all run compare-models compare-models-basic verify-prompts docker-build docker-run docker-dev docker-test docker-clean security-scan security-bandit security-pip-audit
 
 # Auto-detect virtual environment or use default
 VENV_PATH := $(shell if [ -d ".venv" ]; then echo ".venv"; elif [ -d "venv" ]; then echo "venv"; elif [ -d "env" ]; then echo "env"; elif [ -n "$(VIRTUAL_ENV)" ]; then echo "$(VIRTUAL_ENV)"; else echo ".venv"; fi)
@@ -45,6 +45,7 @@ help:
 	@echo "  lint-all             Run all linting and formatting checks"
 	@echo "  lint-no-markdown     Run linting without markdown (for CI)"
 	@echo "  format               Format code with ruff"
+	@echo "  check                Complete dev workflow: format + lint-all + test (⭐ shorthand)"
 	@echo "  security-scan        Run all security scans (bandit + pip-audit)"
 	@echo "  security-bandit      Run bandit security scanner (creates bandit-report.json)"
 	@echo "  security-pip-audit   Run pip-audit dependency vulnerability scanner (creates pip-audit-report.json)"
@@ -264,6 +265,9 @@ lint-all: lint lint-format lint-markdown
 
 # Lint without markdown (for CI environments without Node.js)
 lint-no-markdown: lint lint-format
+
+# Complete code quality check: format, lint, and test (dev workflow shorthand)
+check: format lint-all test
 
 format:
 	@echo "Formatting code with ruff..."

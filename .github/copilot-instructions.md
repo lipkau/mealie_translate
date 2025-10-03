@@ -40,6 +40,7 @@ make setup-full     # Complete development setup
 npm install         # Node.js deps for markdownlint
 make test-unit      # Quick tests during development
 make lint-all       # All code quality checks
+make check          # Complete dev workflow: format + lint-all + test
 make run            # Run the application
 ```
 

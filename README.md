@@ -107,6 +107,21 @@ cd mealie_translate
 make setup-full  # Complete development setup
 ```
 
+### CLI Usage
+
+After setup, run the translator locally:
+
+```bash
+# Process all unprocessed recipes
+python main.py
+
+# Process a specific recipe by slug
+python main.py --recipe my-recipe-slug
+
+# Use custom config file
+python main.py --config /path/to/.env
+```
+
 👥 **Contributing**: See our [Contributing Guide](.github/CONTRIBUTING.md) for development setup, coding standards,
 and contribution workflow.
 
