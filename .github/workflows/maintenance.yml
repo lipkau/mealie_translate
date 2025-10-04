@@ -101,37 +101,3 @@ jobs:
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  maintenance-summary:
-    name: Maintenance Summary
-    runs-on: ubuntu-latest
-    needs: [cleanup-old-images]
-    if: always()
-    steps:
-      - name: Generate Maintenance Report
-        run: |
-          echo "# 🧹 Maintenance Pipeline Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Task | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
-
-          # Cleanup status
-          if [[ "${{ needs.cleanup-old-images.result }}" == "success" ]]; then
-            echo "| Image Cleanup | ✅ Success |" >> $GITHUB_STEP_SUMMARY
-          elif [[ "${{ needs.cleanup-old-images.result }}" == "failure" ]]; then
-            echo "| Image Cleanup | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| Image Cleanup | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## 📊 Maintenance Information" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Registry**: \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Run Time**: $(date -u)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Workflow Run**: #${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🕐 Schedule" >> $GITHUB_STEP_SUMMARY
-          echo "This maintenance pipeline runs daily at 2 AM UTC to keep the container registry clean." >> $GITHUB_STEP_SUMMARY
-          echo "Development images older than 7 days are automatically removed." >> $GITHUB_STEP_SUMMARY
