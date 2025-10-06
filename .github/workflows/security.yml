@@ -401,7 +401,7 @@ jobs:
 
       - name: Run Trivy vulnerability scanner
         if: steps.trivy-image-check.outputs.exists == 'true'
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@0.33.1
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           format: "sarif"
