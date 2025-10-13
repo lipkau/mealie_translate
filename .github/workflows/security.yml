@@ -67,16 +67,16 @@ jobs:
           python-version: "3.13"
 
       # CodeQL static analysis with false positive filtering
-      - uses: github/codeql-action/init@v3
+      - uses: github/codeql-action/init@v4
         with:
           languages: python
           config-file: ./.github/codeql/codeql-config.yml
           queries: security-and-quality
 
       # Manual build step for CodeQL (prevents autobuild conflicts)
-      - uses: github/codeql-action/autobuild@v3
+      - uses: github/codeql-action/autobuild@v4
 
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@v4
         with:
           category: "/language:python"
           upload: false
@@ -159,7 +159,7 @@ jobs:
 
       - name: Upload filtered CodeQL results
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: codeql-filtered.sarif
           category: "/language:python"
@@ -216,7 +216,7 @@ jobs:
 
       - name: Upload Trivy scan results to GitHub Security tab
         if: steps.image-check.outputs.exists == 'true'
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         continue-on-error: true
         with:
           sarif_file: "trivy-results-dev.sarif"
@@ -263,7 +263,7 @@ jobs:
 
       - name: Upload Trivy scan results to GitHub Security tab
         if: steps.image-check.outputs.exists == 'true'
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         continue-on-error: true
         with:
           sarif_file: "trivy-results-latest.sarif"
@@ -344,7 +344,7 @@ jobs:
 
       - name: Upload Scout CVE results to GitHub Security tab
         if: steps.scout-image-check.outputs.exists == 'true' && hashFiles('docker-scout-cves.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         continue-on-error: true
         with:
           sarif_file: docker-scout-cves.sarif
@@ -409,7 +409,7 @@ jobs:
 
       - name: Upload Trivy scan results to GitHub Security tab
         if: steps.trivy-image-check.outputs.exists == 'true'
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: "trivy-results.sarif"
           category: "trivy"
