@@ -82,7 +82,7 @@ jobs:
           fail-on-error: false
 
       - name: Upload test and coverage artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: always()
         with:
           name: test-results-coverage
@@ -132,7 +132,7 @@ jobs:
           reporter: java-junit
           fail-on-error: false
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: always()
         with:
           name: test-results-python-${{ matrix.python-version }}
@@ -177,7 +177,7 @@ jobs:
           fail-on-error: false
 
       - name: Upload integration test artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: always()
         with:
           name: integration-test-results

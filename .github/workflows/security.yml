@@ -165,7 +165,7 @@ jobs:
           category: "/language:python"
         continue-on-error: true
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: always()
         with:
           name: python-security-reports-${{ github.run_id }}
@@ -352,7 +352,7 @@ jobs:
 
       - name: Upload Scout artifacts
         if: steps.scout-image-check.outputs.exists == 'true' && always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: docker-scout-results
           path: |
@@ -416,7 +416,7 @@ jobs:
 
       - name: Upload Trivy results
         if: steps.trivy-image-check.outputs.exists == 'true' && always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: trivy-results
           path: trivy-results.sarif
