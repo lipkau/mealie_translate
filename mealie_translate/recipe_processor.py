@@ -4,6 +4,7 @@ import time
 from typing import Any
 
 from .config import Settings, get_settings
+from .diff_utils import has_changes, log_dry_run_diff
 from .logger import get_logger
 from .mealie_client import MealieClient
 from .translator import RecipeTranslator
@@ -74,6 +75,13 @@ class RecipeProcessor:
         self.logger.info(
             f"Found {len(unprocessed_recipes)} unprocessed recipes to translate"
         )
+
+        # Handle dry run mode
+        if self.settings.dry_run:
+            self.logger.info(
+                f"🔍 DRY RUN MODE: Processing up to {self.settings.dry_run_limit} recipes for preview"
+            )
+            unprocessed_recipes = unprocessed_recipes[: self.settings.dry_run_limit]
 
         # Process recipes in batches
         stats = {
@@ -148,21 +156,35 @@ class RecipeProcessor:
             # Translate the recipe
             translated_recipe = self.translator.translate_recipe(recipe)
 
-            # Update the recipe
-            success = self.mealie_client.update_recipe(recipe_slug, translated_recipe)
-            if not success:
-                self.logger.error(f"Failed to update recipe: {recipe_slug}")
-                return False
+            if self.settings.dry_run:
+                # Dry run mode: show diff and don't update anything
+                recipe_name = recipe.get("name", recipe_slug)
 
-            # Mark as processed
-            mark_success = self.mealie_client.mark_recipe_as_processed(recipe_slug)
-            if not mark_success:
-                self.logger.warning(
-                    f"Failed to mark recipe as processed: {recipe_slug}"
+                if has_changes(recipe, translated_recipe):
+                    log_dry_run_diff(recipe_name, recipe, translated_recipe)
+                    self.logger.info(f"✅ Would translate: {recipe_name}")
+                else:
+                    self.logger.info(f"ℹ️  No changes for: {recipe_name}")
+
+                return True
+            else:
+                # Normal mode: update the recipe
+                success = self.mealie_client.update_recipe(
+                    recipe_slug, translated_recipe
                 )
+                if not success:
+                    self.logger.error(f"Failed to update recipe: {recipe_slug}")
+                    return False
 
-            self.logger.info(f"Successfully processed recipe: {recipe_slug}")
-            return True
+                # Mark as processed
+                mark_success = self.mealie_client.mark_recipe_as_processed(recipe_slug)
+                if not mark_success:
+                    self.logger.warning(
+                        f"Failed to mark recipe as processed: {recipe_slug}"
+                    )
+
+                self.logger.info(f"Successfully processed recipe: {recipe_slug}")
+                return True
 
         except Exception as e:
             self.logger.error(f"Error processing recipe {recipe_slug}: {e}")
@@ -224,27 +246,41 @@ class RecipeProcessor:
                 # Translate the recipe
                 translated_recipe = self.translator.translate_recipe(full_recipe)
 
-                # Update the recipe in Mealie
-                success = self.mealie_client.update_recipe(
-                    recipe_slug, translated_recipe
-                )
-                if not success:
-                    self.logger.error(f"Failed to update recipe: {recipe_slug}")
-                    stats["failed"] += 1
-                    continue
+                if self.settings.dry_run:
+                    # Dry run mode: show diff and don't update anything
+                    recipe_name = full_recipe.get("name", recipe_slug)
 
-                # Mark as processed
-                mark_success = self.mealie_client.mark_recipe_as_processed(recipe_slug)
-                if not mark_success:
-                    self.logger.warning(
-                        f"Failed to mark recipe as processed: {recipe_slug}"
+                    if has_changes(full_recipe, translated_recipe):
+                        log_dry_run_diff(recipe_name, full_recipe, translated_recipe)
+                        self.logger.info(f"✅ Would translate: {recipe_name}")
+                    else:
+                        self.logger.info(f"ℹ️  No changes for: {recipe_name}")
+
+                    stats["processed"] += 1
+                else:
+                    # Normal mode: update the recipe
+                    success = self.mealie_client.update_recipe(
+                        recipe_slug, translated_recipe
                     )
+                    if not success:
+                        self.logger.error(f"Failed to update recipe: {recipe_slug}")
+                        stats["failed"] += 1
+                        continue
 
-                stats["processed"] += 1
-                self.logger.info(
-                    "Successfully processed: "
-                    f"{translated_recipe.get('name', recipe_slug)}"
-                )
+                    # Mark as processed
+                    mark_success = self.mealie_client.mark_recipe_as_processed(
+                        recipe_slug
+                    )
+                    if not mark_success:
+                        self.logger.warning(
+                            f"Failed to mark recipe as processed: {recipe_slug}"
+                        )
+
+                    stats["processed"] += 1
+                    self.logger.info(
+                        "Successfully processed: "
+                        f"{translated_recipe.get('name', recipe_slug)}"
+                    )
 
                 # Small delay between recipes
                 time.sleep(1)
