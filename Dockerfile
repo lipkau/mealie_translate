@@ -1,5 +1,5 @@
 # Stage 1: Base image with Python requirements
-FROM python:3.15.0a5-slim AS base
+FROM python:3.15.0a6-slim AS base
 
 
 # Add image labels for metadata
