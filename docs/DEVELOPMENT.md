@@ -530,7 +530,7 @@ recipe['extras'] = {'translated': 'true'}
 
 **Features:**
 
-- Primary model configuration (GPT-4, GPT-3.5-turbo)
+- Primary model configuration (GPT-4o, GPT-4.1-mini)
 - Automatic fallback for rate limiting
 - Cost optimization for different use cases
 - Performance monitoring and comparison

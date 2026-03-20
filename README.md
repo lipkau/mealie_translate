@@ -125,7 +125,8 @@ python main.py --config /path/to/.env
 👥 **Contributing**: See our [Contributing Guide](.github/CONTRIBUTING.md) for development setup, coding standards,
 and contribution workflow.
 
-📚 **Documentation**: Complete guides available in [`docs/`](docs/) including deployment, development, and architecture details.
+📚 **Documentation**: Complete guides available in [`docs/`](docs/) including deployment, development,
+and architecture details.
 
 ## OpenAI Model Comparison
 

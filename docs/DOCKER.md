@@ -211,7 +211,7 @@ MEALIE_API_TOKEN=your_mealie_api_token
 
 # OpenAI Configuration
 OPENAI_API_KEY=your_openai_api_key
-OPENAI_MODEL=gpt-4
+OPENAI_MODEL=gpt-4.1-mini
 
 # Optional: Cron Schedule
 CRON_SCHEDULE=0 */6 * * *
