@@ -14,6 +14,11 @@ This directory contains all project documentation for the Mealie Recipe Translat
   Makefile commands
 - **[Docker Guide](DOCKER.md)** - Complete Docker containerization, deployment, scheduling, and registry guide
 
+## Recipe Organisation
+
+- **[Recipe Taxonomy](TAXONOMY.md)** - Two-dimensional indexing system: controlled `categories` (course/meal position)
+  and structured `tags` (cuisine, ingredient, method, dietary, etc.)
+
 ## Architecture & Security
 
 - **[CI/CD Architecture](CI_CD_ARCHITECTURE.md)** - Separated pipeline design and deployment workflow
