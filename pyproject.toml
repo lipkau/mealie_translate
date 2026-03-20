@@ -150,6 +150,10 @@ ignore = [
     "E402",  # Module level import not at top of file (for sys.path manipulation)
     "F841",  # Local variable assigned to but never used (for mocked variables)
 ]
+"tools/*" = [
+    "E402",  # Module level import not at top of file (for sys.path manipulation)
+    "D107",  # Missing docstring in __init__ (tools are scripts, not libraries)
+]
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
 fixable = ["ALL"]

@@ -4,11 +4,11 @@
   "description": "Documentation tooling for Mealie Recipe Translator",
   "private": true,
   "devDependencies": {
-    "markdownlint-cli": "^0.48.0",
-    "pyright": "^1.1.408"
+    "markdownlint-cli2": "0.21.0",
+    "pyright": "1.1.408"
   },
   "scripts": {
-    "lint:markdown": "markdownlint **/*.md",
-    "lint:markdown:fix": "markdownlint --fix **/*.md"
+    "lint:markdown": "markdownlint-cli2 \"**/*.md\"",
+    "lint:markdown:fix": "markdownlint-cli2 --fix \"**/*.md\""
   }
 }

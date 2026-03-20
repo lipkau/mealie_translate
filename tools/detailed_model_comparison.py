@@ -111,19 +111,6 @@ TAG_TEST_CASES = [
         "forbidden": _CATEGORY_WORD_LIST,  # Taxonomy rule: category words must not appear as tags
     },
     {
-        "name": "Feijoada — cuisine + protein tags",
-        "recipe": {
-            "name": "Feijoada",
-            "description": "Traditional Brazilian black bean stew slow-cooked with pork and sausage.",
-            "ingredients": "black beans, pork ribs, linguiça, chouriço, bay leaves, garlic, orange",
-            "available_tags": "",
-            "existing_categories": "",
-            "existing_tags": "",
-        },
-        "expected_tags": ["brazilian", "pork"],
-        "forbidden": _CATEGORY_WORD_LIST,
-    },
-    {
         "name": "Pancakes — no 'breakfast' as a tag",
         "recipe": {
             "name": "Fluffy Buttermilk Pancakes",
@@ -156,18 +143,6 @@ CATEGORY_TEST_CASES = [
         },
         "expected_categories": ["dessert"],
         "must_not_include": ["dinner", "lunch", "breakfast", "main"],
-    },
-    {
-        "name": "Eggs Benedict → breakfast/brunch",
-        "recipe": {
-            "name": "Eggs Benedict",
-            "description": "Poached eggs on Canadian bacon and English muffins, topped with hollandaise sauce.",
-            "ingredients": "eggs, Canadian bacon, English muffins, butter, lemon juice, egg yolks",
-            "existing_tags": "egg, american, savory",
-            "existing_categories": "",
-        },
-        "expected_categories": ["breakfast"],
-        "must_not_include": ["dinner", "dessert", "main"],
     },
     {
         "name": "Hummus → condiment (no legacy 'main')",

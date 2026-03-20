@@ -1,0 +1,22 @@
+{
+  "ignores": [
+    "node_modules/**",
+    "htmlcov/**",
+    "mealie_recipe_translator.egg-info/**",
+    ".venv/**",
+    ".github/**"
+  ],
+  "config": {
+    "line-length": {
+      "line_length": 120,
+      "heading_line_length": 120,
+      "code_block_line_length": 120,
+      "tables": false
+    },
+    "no-bare-urls": false,
+    "no-duplicate-heading": {
+      "siblings_only": true
+    },
+    "table-column-style": false
+  }
+}
