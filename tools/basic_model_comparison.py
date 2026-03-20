@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
-"""Model comparison script to test different GPT models for recipe translation and unit conversion.
+"""Model comparison script to test different GPT models across the full feature set.
 
-This script directly calls methods from the production RecipeTranslator class,
-ensuring perfect consistency and automatic updates when prompts are improved.
+Covers three dimensions of the production feature set:
+  1. Unit conversion  — edge cases (fractions, stick of butter, Gas Mark, passthrough)
+  2. Tagging          — taxonomy rule compliance (no category-word bleed, expected tags present)
+  3. Categorisation   — controlled-vocabulary compliance (ALLOWED_CATEGORIES only)
+
+This script directly calls methods from the production RecipeTranslator and
+re-uses the organizer prompt constants, ensuring results stay in sync when
+prompts change.
 """
 
 import sys
@@ -15,75 +21,149 @@ project_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(project_dir))
 
 from mealie_translate.config import get_settings
+from mealie_translate.organizer import (
+    ALLOWED_CATEGORIES,
+    CATEGORY_GENERATION_PROMPT,
+    TAG_GENERATION_PROMPT,
+)
 from mealie_translate.translator import RecipeTranslator
 
 
 class ModelComparison:
-    """Compare different GPT models for recipe translation and unit conversion."""
+    """Compare different GPT models across the full production feature set."""
 
     def __init__(self):
         self.settings = get_settings()
         if not self.settings.openai_api_key:
             raise ValueError("OpenAI API key is required for model comparison")
 
-        # Models to compare - you can update these when new models become available
+        # Models to compare - ordered from cheapest to most capable
         self.models = [
+            # gpt-5.4 flagship series (as of March 2026)
+            "gpt-5.4-nano",
+            "gpt-5.4-mini",
+            "gpt-5.4",
+            # gpt-4.1 series
+            "gpt-4.1-nano",
+            "gpt-4.1-mini",
+            "gpt-4.1",
+            # gpt-4o series (legacy reference)
             "gpt-4o-mini",
             "gpt-4o",
-            "gpt-3.5-turbo",
-            # Uncomment these when they become available:
-            "gpt-4.1",
-            "gpt-4.1-mini",
-            "gpt-4.1-nano",
         ]
 
-        # Test cases for comparison
-        self.test_cases = [
+        # ── Unit conversion test cases (edge cases) ────────────────────────────
+        self.unit_cases = [
             {
-                "name": "Volume Conversion (1 cup flour)",
-                "input": "1 cup all-purpose flour",
-                "expected_elements": ["240", "ml", "flour"],
+                "name": "Fraction: 3/4 cup",
+                "input": "3/4 cup all-purpose flour",
+                "expected_elements": ["180", "ml"],
             },
             {
-                "name": "Volume Conversion (1 cup sugar)",
-                "input": "1 cup sugar",
-                "expected_elements": ["240", "ml", "sugar"],
+                "name": "Fraction: 1/3 cup",
+                "input": "1/3 cup honey",
+                "expected_elements": ["80", "ml"],
             },
             {
-                "name": "Volume Conversion (2 cups)",
-                "input": "2 cups all-purpose flour",
-                "expected_elements": ["480", "ml", "flour"],
+                "name": "Stick of butter (domain knowledge)",
+                "input": "2 sticks of butter, softened",
+                "expected_elements": ["226", "g"],
             },
             {
-                "name": "Mass Conversion",
-                "input": "1 pound ground beef",
-                "expected_elements": ["455", "g", "beef"],
+                "name": "Mixed number: 2 1/4 cups",
+                "input": "2 1/4 cups whole milk",
+                "expected_elements": ["540", "ml"],
             },
             {
-                "name": "Temperature Conversion",
-                "input": "Bake at 350°F for 25 minutes",
-                "expected_elements": ["175", "°C", "25"],
+                "name": "Gas Mark temperature (UK unit)",
+                "input": "Preheat the oven to Gas Mark 6",
+                "expected_elements": ["200", "°C"],
             },
             {
-                "name": "Mixed Units",
-                "input": "Mix 8 ounces cream cheese with 1 tablespoon sugar",
-                "expected_elements": ["225", "g", "15", "ml"],
+                "name": "Passthrough — already metric",
+                "input": "Bring 500 ml of water to a boil at 100°C",
+                "expected_elements": ["500", "ml", "100", "°C"],
+            },
+            {
+                "name": "Multi-unit instruction",
+                "input": "Rub 2 lbs of pork with 1/4 cup spice blend and roast at 325°F for 2 hours",
+                "expected_elements": ["910", "g", "60", "ml", "165", "°C"],
+            },
+        ]
+
+        _category_word_list = sorted(ALLOWED_CATEGORIES)
+
+        # ── Tagging test cases ────────────────────────────────────────────────────
+        # expected_tags: must appear; forbidden: must NOT appear (taxonomy rule)
+        self.tag_cases = [
+            {
+                "name": "Carbonara — cuisine + no category bleed",
+                "recipe": {
+                    "name": "Spaghetti Carbonara",
+                    "description": "Classic Roman pasta dish with guanciale, eggs, pecorino and black pepper.",
+                    "ingredients": "spaghetti, guanciale, eggs, pecorino romano, black pepper",
+                    "available_tags": "",
+                    "existing_categories": "dinner",
+                    "existing_tags": "",
+                },
+                "expected_tags": ["italian", "pasta"],
+                "forbidden": _category_word_list,
+            },
+            {
+                "name": "Pancakes — no 'breakfast' as a tag",
+                "recipe": {
+                    "name": "Fluffy Buttermilk Pancakes",
+                    "description": "Light and fluffy pancakes with buttermilk and maple syrup.",
+                    "ingredients": "flour, buttermilk, eggs, butter, sugar, baking powder, vanilla",
+                    "available_tags": "",
+                    "existing_categories": "breakfast",
+                    "existing_tags": "",
+                },
+                "expected_tags": ["sweet"],
+                "forbidden": ["breakfast", "brunch", "lunch", "dinner"],
+            },
+        ]
+
+        # ── Category test cases ─────────────────────────────────────────────────
+        # expected_categories: must appear; must_not_include: banned assignments
+        self.category_cases = [
+            {
+                "name": "Chocolate Lava Cake → dessert",
+                "recipe": {
+                    "name": "Chocolate Lava Cake",
+                    "description": "Warm chocolate cakes with a molten center, served with ice cream.",
+                    "ingredients": "dark chocolate, butter, eggs, sugar, flour, vanilla",
+                    "existing_tags": "chocolate, baked, sweet",
+                    "existing_categories": "",
+                },
+                "expected_categories": ["dessert"],
+                "must_not_include": ["dinner", "lunch", "breakfast", "main"],
+            },
+            {
+                "name": "Hummus → condiment (no legacy 'main')",
+                "recipe": {
+                    "name": "Classic Hummus",
+                    "description": "Creamy Middle Eastern chickpea dip with tahini, lemon and garlic.",
+                    "ingredients": "chickpeas, tahini, lemon juice, garlic, olive oil, cumin",
+                    "existing_tags": "middle-eastern, vegetarian, no-cook",
+                    "existing_categories": "",
+                },
+                "expected_categories": ["condiment"],
+                "must_not_include": ["main", "dinner"],
             },
         ]
 
     def test_model(self, model_name: str) -> dict[str, Any]:
-        """Test a specific model with all test cases."""
+        """Test a specific model across unit conversion, tagging, and categorisation."""
         print(f"\n🧪 Testing model: {model_name}")
         print("-" * 50)
 
-        # Create a translator instance with the specific model
         translator = RecipeTranslator(self.settings)
+        total_cases = len(self.unit_cases) + len(self.tag_cases) + len(self.category_cases)
 
-        # Temporarily override the model
-        original_model = None
-        results = {
+        results: dict[str, Any] = {
             "model": model_name,
-            "total_tests": len(self.test_cases),
+            "total_tests": total_cases,
             "passed": 0,
             "failed": 0,
             "errors": 0,
@@ -91,76 +171,125 @@ class ModelComparison:
             "average_time": 0,
             "total_time": 0,
         }
+        total_time = 0.0
 
-        total_time = 0
-
-        for i, test_case in enumerate(self.test_cases, 1):
-            print(f"  {i}. {test_case['name']}: ", end="")
-
-            start_time = time.time()
+        # ─ Unit conversion ────────────────────────────────────────────────────
+        print("  📐 Unit Conversion:")
+        for i, tc in enumerate(self.unit_cases, 1):
+            print(f"    {i}. {tc['name']}: ", end="")
+            start = time.time()
             try:
-                # Use the translator's method directly - this is TRUE reuse!
-                # Any improvements to the prompt logic will automatically be used here
-                output = translator.translate_text_with_model(
-                    test_case["input"], model_name
-                )
-
-                end_time = time.time()
-                test_time = end_time - start_time
-                total_time += test_time
-
-                # Check if expected elements are present
-                missing_elements = []
-                for expected in test_case["expected_elements"]:
-                    if expected.lower() not in output.lower():
-                        missing_elements.append(expected)
-
-                test_result = {
-                    "name": test_case["name"],
-                    "input": test_case["input"],
-                    "output": output,
-                    "expected": test_case["expected_elements"],
-                    "missing": missing_elements,
-                    "passed": len(missing_elements) == 0,
-                    "time": test_time,
-                }
-
-                if test_result["passed"]:
-                    print(f"✅ ({test_time:.2f}s)")
+                output = translator.translate_text_with_model(tc["input"], model_name)
+                elapsed = time.time() - start
+                total_time += elapsed
+                missing = [e for e in tc["expected_elements"] if e.lower() not in output.lower()]
+                passed = len(missing) == 0
+                if passed:
+                    print(f"✅ ({elapsed:.2f}s)")
                     results["passed"] += 1
                 else:
-                    print(f"❌ Missing: {missing_elements} ({test_time:.2f}s)")
+                    print(f"❌ Missing: {missing} ({elapsed:.2f}s)")
                     results["failed"] += 1
-
-                results["test_results"].append(test_result)
-
+                results["test_results"].append({
+                    "name": tc["name"], "type": "unit",
+                    "input": tc["input"], "output": output,
+                    "passed": passed, "time": elapsed,
+                })
             except Exception as e:
-                end_time = time.time()
-                test_time = end_time - start_time
-                total_time += test_time
-
-                print(f"❌ Error: {str(e)[:50]}... ({test_time:.2f}s)")
+                elapsed = time.time() - start
+                total_time += elapsed
+                print(f"❌ Error: {str(e)[:50]}... ({elapsed:.2f}s)")
                 results["errors"] += 1
-                results["test_results"].append(
-                    {
-                        "name": test_case["name"],
-                        "input": test_case["input"],
-                        "output": f"ERROR: {e}",
-                        "expected": test_case["expected_elements"],
-                        "missing": test_case["expected_elements"],
-                        "passed": False,
-                        "time": test_time,
-                    }
-                )
+                results["test_results"].append({
+                    "name": tc["name"], "type": "unit",
+                    "output": f"ERROR: {e}", "passed": False, "time": elapsed,
+                })
+
+        # ─ Tagging ───────────────────────────────────────────────────────────
+        print("  🏷️  Tagging:")
+        for i, tc in enumerate(self.tag_cases, 1):
+            print(f"    {i}. {tc['name']}: ", end="")
+            prompt = TAG_GENERATION_PROMPT.format(**tc["recipe"])
+            start = time.time()
+            try:
+                output = translator._call_openai(prompt, model_name)
+                elapsed = time.time() - start
+                total_time += elapsed
+                tags_raw = [t.strip().lower() for t in output.split(",") if t.strip()]
+                violations = [w for w in tc["forbidden"] if w in tags_raw]
+                missing_expected = [t for t in tc["expected_tags"] if not any(t in tag for tag in tags_raw)]
+                passed = not violations and not missing_expected
+                if passed:
+                    print(f"✅ ({elapsed:.2f}s)")
+                    results["passed"] += 1
+                elif violations:
+                    print(f"❌ category bleed: {violations} ({elapsed:.2f}s)")
+                    results["failed"] += 1
+                else:
+                    print(f"❌ missing tags: {missing_expected} ({elapsed:.2f}s)")
+                    results["failed"] += 1
+                results["test_results"].append({
+                    "name": tc["name"], "type": "tag",
+                    "output": output, "passed": passed, "time": elapsed,
+                })
+            except Exception as e:
+                elapsed = time.time() - start
+                total_time += elapsed
+                print(f"❌ Error: {str(e)[:50]}... ({elapsed:.2f}s)")
+                results["errors"] += 1
+                results["test_results"].append({
+                    "name": tc["name"], "type": "tag",
+                    "output": f"ERROR: {e}", "passed": False, "time": elapsed,
+                })
+
+        # ─ Categorisation ───────────────────────────────────────────────────
+        print("  📂 Categorisation:")
+        for i, tc in enumerate(self.category_cases, 1):
+            print(f"    {i}. {tc['name']}: ", end="")
+            prompt = CATEGORY_GENERATION_PROMPT.format(**tc["recipe"])
+            start = time.time()
+            try:
+                output = translator._call_openai(prompt, model_name)
+                elapsed = time.time() - start
+                total_time += elapsed
+                cats_raw = [c.strip().lower() for c in output.split(",") if c.strip()]
+                vocab_violations = [c for c in cats_raw if c not in ALLOWED_CATEGORIES]
+                missing_expected = [c for c in tc["expected_categories"] if c not in cats_raw]
+                wrong = [c for c in tc["must_not_include"] if c in cats_raw]
+                passed = not vocab_violations and not missing_expected and not wrong
+                if passed:
+                    print(f"✅ ({elapsed:.2f}s)")
+                    results["passed"] += 1
+                elif vocab_violations:
+                    print(f"❌ vocab error: {vocab_violations} ({elapsed:.2f}s)")
+                    results["failed"] += 1
+                elif wrong:
+                    print(f"❌ wrong category: {wrong} ({elapsed:.2f}s)")
+                    results["failed"] += 1
+                else:
+                    print(f"❌ missing: {missing_expected} ({elapsed:.2f}s)")
+                    results["failed"] += 1
+                results["test_results"].append({
+                    "name": tc["name"], "type": "category",
+                    "output": output, "passed": passed, "time": elapsed,
+                })
+            except Exception as e:
+                elapsed = time.time() - start
+                total_time += elapsed
+                print(f"❌ Error: {str(e)[:50]}... ({elapsed:.2f}s)")
+                results["errors"] += 1
+                results["test_results"].append({
+                    "name": tc["name"], "type": "category",
+                    "output": f"ERROR: {e}", "passed": False, "time": elapsed,
+                })
 
         results["total_time"] = total_time
-        results["average_time"] = total_time / len(self.test_cases)
-
+        results["average_time"] = total_time / total_cases
         return results
 
     def run_comparison(self) -> dict[str, Any]:
         """Run comparison across all models."""
-        print("🔬 GPT Model Comparison for Recipe Translation & Unit Conversion")
+        print("🔬 GPT Model Comparison — Unit Conversion · Tagging · Categorisation")
         print("=" * 70)
 
         all_results = {}
@@ -171,13 +300,14 @@ class ModelComparison:
                 all_results[model] = results
             except Exception as e:
                 print(f"\n❌ Failed to test model {model}: {e}")
+                total_cases = len(self.unit_cases) + len(self.tag_cases) + len(self.category_cases)
                 all_results[model] = {
                     "model": model,
                     "error": str(e),
-                    "total_tests": len(self.test_cases),
+                    "total_tests": total_cases,
                     "passed": 0,
                     "failed": 0,
-                    "errors": len(self.test_cases),
+                    "errors": total_cases,
                 }
 
         return all_results
@@ -223,6 +353,10 @@ class ModelComparison:
                 print(
                     f"{model_name:<20} {success_rate:>8.1f}%    {avg_time:>6.2f}s    {total_time:>8.2f}s    {status}"
                 )
+
+        print(
+            f"\n⚠️  Note: success rate covers unit conversion, tagging taxonomy rules, and category vocabulary compliance."
+        )
 
         print("\n🏆 Best performing model:")
         if sorted_models:

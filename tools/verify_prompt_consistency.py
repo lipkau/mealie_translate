@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""
-Quick verification that the model comparison tools now use the same prompts as production.
-"""
+"""Quick verification that the model comparison tools now use the same prompts as production."""
 
 import sys
 from pathlib import Path
@@ -35,8 +33,8 @@ def verify_prompt_consistency():
         print(f"   {translator.TRANSLATION_RULES_BASE[:100]}...")
 
         print(f"\n4. Model: {translator.model}")
-        print(f"5. Max Tokens: 2000")
-        print(f"6. Temperature: 0.1")
+        print("5. Max Tokens: 2000")
+        print("6. Temperature: 0.1")
 
         print("\n✅ SUCCESS: Model comparison tools now use identical prompts!")
         print("   Both basic_model_comparison.py and detailed_model_comparison.py")
