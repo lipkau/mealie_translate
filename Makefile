@@ -1,4 +1,4 @@
-.PHONY: help setup setup-full setup-env install install-dev test test-unit test-integration test-coverage lint lint-format lint-markdown lint-all lint-no-markdown format check pre-commit pre-commit-force pre-commit-uninstall clean clean-all run compare-models compare-models-basic verify-prompts docker-build docker-run docker-dev docker-test docker-clean security-scan security-bandit security-pip-audit
+.PHONY: help setup setup-full setup-env install install-dev test test-unit test-integration test-coverage lint lint-format lint-markdown lint-all lint-no-markdown format check pre-commit pre-commit-force pre-commit-uninstall clean clean-all run compare-models compare-models-basic verify-prompts generate-tags docker-build docker-run docker-dev docker-test docker-clean security-scan security-bandit security-pip-audit
 
 # Auto-detect virtual environment or use default
 VENV_PATH := $(shell if [ -d ".venv" ]; then echo ".venv"; elif [ -d "venv" ]; then echo "venv"; elif [ -d "env" ]; then echo "env"; elif [ -n "$(VIRTUAL_ENV)" ]; then echo "$(VIRTUAL_ENV)"; else echo ".venv"; fi)
@@ -41,7 +41,7 @@ help:
 	@echo "  test-coverage        Run tests with coverage report (generates JUnit XML, HTML, and coverage reports)"
 	@echo "  lint                 Run code linting (ruff, pyright)"
 	@echo "  lint-format          Check code formatting (ruff)"
-	@echo "  lint-markdown        Check markdown formatting (markdownlint)"
+	@echo "  lint-markdown        Check markdown formatting (markdownlint-cli2)"
 	@echo "  lint-all             Run all linting and formatting checks"
 	@echo "  lint-no-markdown     Run linting without markdown (for CI)"
 	@echo "  format               Format code with ruff"
@@ -62,6 +62,7 @@ help:
 	@echo "  compare-models       Run detailed model comparison"
 	@echo "  compare-models-basic Run basic model comparison"
 	@echo "  verify-prompts       Verify model comparison uses production prompts"
+	@echo "  generate-tags        Generate and assign tags for all recipes using LLM"
 	@echo ""
 	@echo "Docker Commands:"
 	@echo "  docker-build         Build Docker image"
@@ -229,7 +230,7 @@ lint:
 		echo "⚠️  ruff not found. Run 'make setup' first to install dependencies."; \
 		exit 1; \
 	fi
-	$(PYTHON) -m ruff check mealie_translate/ tests/ main.py
+	$(PYTHON) -m ruff check mealie_translate/ tests/ tools/ main.py
 	@if ! command -v npx >/dev/null 2>&1; then \
 		echo "⚠️  npx not found. Install Node.js or run 'npm install'."; \
 		exit 1; \
@@ -246,18 +247,18 @@ lint-format:
 		echo "⚠️  ruff not found. Run 'make setup' first to install dependencies."; \
 		exit 1; \
 	fi
-	$(PYTHON) -m ruff format --check mealie_translate/ tests/ main.py
+	$(PYTHON) -m ruff format --check mealie_translate/ tests/ tools/ main.py
 
 lint-markdown:
 	@echo "Checking markdown formatting..."
 	@if command -v npx >/dev/null 2>&1 && [ -f package.json ]; then \
-		echo "Using npx markdownlint (from package.json)..."; \
-		npx markdownlint **/*.md; \
-	elif command -v markdownlint >/dev/null 2>&1; then \
-		echo "Using global markdownlint..."; \
-		markdownlint **/*.md; \
+		echo "Using npx markdownlint-cli2 (from package.json)..."; \
+		npx markdownlint-cli2 "**/*.md"; \
+	elif command -v markdownlint-cli2 >/dev/null 2>&1; then \
+		echo "Using global markdownlint-cli2..."; \
+		markdownlint-cli2 "**/*.md"; \
 	else \
-		echo "⚠️  markdownlint not found. Install with: npm install or npm install -g markdownlint-cli"; \
+		echo "⚠️  markdownlint-cli2 not found. Install with: npm install or npm install -g markdownlint-cli2"; \
 		exit 1; \
 	fi
 
@@ -275,8 +276,8 @@ format:
 		echo "⚠️  ruff not found. Run 'make setup' first to install dependencies."; \
 		exit 1; \
 	fi
-	$(PYTHON) -m ruff check --fix mealie_translate/ tests/ main.py
-	$(PYTHON) -m ruff format mealie_translate/ tests/ main.py
+	$(PYTHON) -m ruff check --fix mealie_translate/ tests/ tools/ main.py
+	$(PYTHON) -m ruff format mealie_translate/ tests/ tools/ main.py
 
 # Pre-commit hooks
 pre-commit:
@@ -415,6 +416,13 @@ verify-prompts:
 		exit 1; \
 	fi
 	$(PYTHON) tools/verify_prompt_consistency.py
+
+generate-tags:
+	@if ! $(PYTHON) --version >/dev/null 2>&1; then \
+		echo "⚠️  Python not found at $(PYTHON). Run 'make setup' first."; \
+		exit 1; \
+	fi
+	$(PYTHON) tools/generate_tags.py $(ARGS)
 
 # Docker commands
 docker-build:
