@@ -360,7 +360,7 @@ Return the translations with unit conversions in the same numbered format:
                         },
                         {"role": "user", "content": prompt},
                     ],
-                    max_tokens=2000,  # Increased for longer recipes
+                    max_completion_tokens=2000,  # Increased for longer recipes
                     temperature=0.1,  # Low temperature for consistent translations
                 )
 
