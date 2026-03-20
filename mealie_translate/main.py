@@ -5,6 +5,7 @@ import argparse
 
 from .config import get_settings
 from .logger import get_logger
+from .organizer import RecipeOrganizer
 from .recipe_processor import RecipeProcessor
 
 
@@ -17,8 +18,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python main.py                        # Process all unprocessed recipes
-  python main.py --recipe my-recipe-slug # Process a specific recipe
+  python main.py                         # Translate + organise all recipes
+  python main.py --recipe my-recipe-slug # Translate + organise a specific recipe
+  python main.py --skip-organise         # Translate only, skip tag/category generation
         """,
     )
 
@@ -28,6 +30,12 @@ Examples:
         "--config",
         type=str,
         help="Path to .env file (default: .env in current directory)",
+    )
+
+    parser.add_argument(
+        "--skip-organise",
+        action="store_true",
+        help="Skip tag and category generation after translation",
     )
 
     args = parser.parse_args()
@@ -51,25 +59,33 @@ Examples:
 
         logger.info("Configuration loaded successfully")
 
-        # Initialize processor
         processor = RecipeProcessor(settings)
+        organizer = RecipeOrganizer(settings=settings)
 
-        # Process recipes
         if args.recipe:
-            # Process specific recipe
+            # Translate the specific recipe
             logger.info(f"Processing specific recipe: {args.recipe}")
             result = processor.process_single_recipe(args.recipe)
-            if result:
-                logger.info(f"Successfully processed recipe: {args.recipe}")
-            else:
+            if not result:
                 logger.error(f"Failed to process recipe: {args.recipe}")
                 return 1
-        else:
-            # Process all unprocessed recipes
-            logger.info("Starting to process all unprocessed recipes")
-            results = processor.process_all_recipes()
+            logger.info(f"Successfully translated recipe: {args.recipe}")
 
-            logger.info(f"Processing complete. Results: {results}")
+            # Organise the same recipe unless skipped
+            if not args.skip_organise:
+                logger.info(f"Organising recipe: {args.recipe}")
+                organizer.process_recipe(args.recipe)
+        else:
+            # Translate all unprocessed recipes
+            logger.info("Starting to translate all unprocessed recipes")
+            results = processor.process_all_recipes()
+            logger.info(f"Translation complete. Results: {results}")
+
+            # Organise all recipes (including already-translated ones)
+            if not args.skip_organise:
+                logger.info("Starting to organise all recipes (tags + categories)")
+                org_results = organizer.process_all_recipes()
+                logger.info(f"Organisation complete. Results: {org_results}")
 
     except Exception as e:
         logger.error(f"Application error: {str(e)}")
