@@ -159,7 +159,9 @@ class ModelComparison:
         print("-" * 50)
 
         translator = RecipeTranslator(self.settings)
-        total_cases = len(self.unit_cases) + len(self.tag_cases) + len(self.category_cases)
+        total_cases = (
+            len(self.unit_cases) + len(self.tag_cases) + len(self.category_cases)
+        )
 
         results: dict[str, Any] = {
             "model": model_name,
@@ -182,7 +184,11 @@ class ModelComparison:
                 output = translator.translate_text_with_model(tc["input"], model_name)
                 elapsed = time.time() - start
                 total_time += elapsed
-                missing = [e for e in tc["expected_elements"] if e.lower() not in output.lower()]
+                missing = [
+                    e
+                    for e in tc["expected_elements"]
+                    if e.lower() not in output.lower()
+                ]
                 passed = len(missing) == 0
                 if passed:
                     print(f"✅ ({elapsed:.2f}s)")
@@ -190,20 +196,30 @@ class ModelComparison:
                 else:
                     print(f"❌ Missing: {missing} ({elapsed:.2f}s)")
                     results["failed"] += 1
-                results["test_results"].append({
-                    "name": tc["name"], "type": "unit",
-                    "input": tc["input"], "output": output,
-                    "passed": passed, "time": elapsed,
-                })
+                results["test_results"].append(
+                    {
+                        "name": tc["name"],
+                        "type": "unit",
+                        "input": tc["input"],
+                        "output": output,
+                        "passed": passed,
+                        "time": elapsed,
+                    }
+                )
             except Exception as e:
                 elapsed = time.time() - start
                 total_time += elapsed
                 print(f"❌ Error: {str(e)[:50]}... ({elapsed:.2f}s)")
                 results["errors"] += 1
-                results["test_results"].append({
-                    "name": tc["name"], "type": "unit",
-                    "output": f"ERROR: {e}", "passed": False, "time": elapsed,
-                })
+                results["test_results"].append(
+                    {
+                        "name": tc["name"],
+                        "type": "unit",
+                        "output": f"ERROR: {e}",
+                        "passed": False,
+                        "time": elapsed,
+                    }
+                )
 
         # ─ Tagging ───────────────────────────────────────────────────────────
         print("  🏷️  Tagging:")
@@ -217,7 +233,11 @@ class ModelComparison:
                 total_time += elapsed
                 tags_raw = [t.strip().lower() for t in output.split(",") if t.strip()]
                 violations = [w for w in tc["forbidden"] if w in tags_raw]
-                missing_expected = [t for t in tc["expected_tags"] if not any(t in tag for tag in tags_raw)]
+                missing_expected = [
+                    t
+                    for t in tc["expected_tags"]
+                    if not any(t in tag for tag in tags_raw)
+                ]
                 passed = not violations and not missing_expected
                 if passed:
                     print(f"✅ ({elapsed:.2f}s)")
@@ -228,19 +248,29 @@ class ModelComparison:
                 else:
                     print(f"❌ missing tags: {missing_expected} ({elapsed:.2f}s)")
                     results["failed"] += 1
-                results["test_results"].append({
-                    "name": tc["name"], "type": "tag",
-                    "output": output, "passed": passed, "time": elapsed,
-                })
+                results["test_results"].append(
+                    {
+                        "name": tc["name"],
+                        "type": "tag",
+                        "output": output,
+                        "passed": passed,
+                        "time": elapsed,
+                    }
+                )
             except Exception as e:
                 elapsed = time.time() - start
                 total_time += elapsed
                 print(f"❌ Error: {str(e)[:50]}... ({elapsed:.2f}s)")
                 results["errors"] += 1
-                results["test_results"].append({
-                    "name": tc["name"], "type": "tag",
-                    "output": f"ERROR: {e}", "passed": False, "time": elapsed,
-                })
+                results["test_results"].append(
+                    {
+                        "name": tc["name"],
+                        "type": "tag",
+                        "output": f"ERROR: {e}",
+                        "passed": False,
+                        "time": elapsed,
+                    }
+                )
 
         # ─ Categorisation ───────────────────────────────────────────────────
         print("  📂 Categorisation:")
@@ -254,7 +284,9 @@ class ModelComparison:
                 total_time += elapsed
                 cats_raw = [c.strip().lower() for c in output.split(",") if c.strip()]
                 vocab_violations = [c for c in cats_raw if c not in ALLOWED_CATEGORIES]
-                missing_expected = [c for c in tc["expected_categories"] if c not in cats_raw]
+                missing_expected = [
+                    c for c in tc["expected_categories"] if c not in cats_raw
+                ]
                 wrong = [c for c in tc["must_not_include"] if c in cats_raw]
                 passed = not vocab_violations and not missing_expected and not wrong
                 if passed:
@@ -269,19 +301,29 @@ class ModelComparison:
                 else:
                     print(f"❌ missing: {missing_expected} ({elapsed:.2f}s)")
                     results["failed"] += 1
-                results["test_results"].append({
-                    "name": tc["name"], "type": "category",
-                    "output": output, "passed": passed, "time": elapsed,
-                })
+                results["test_results"].append(
+                    {
+                        "name": tc["name"],
+                        "type": "category",
+                        "output": output,
+                        "passed": passed,
+                        "time": elapsed,
+                    }
+                )
             except Exception as e:
                 elapsed = time.time() - start
                 total_time += elapsed
                 print(f"❌ Error: {str(e)[:50]}... ({elapsed:.2f}s)")
                 results["errors"] += 1
-                results["test_results"].append({
-                    "name": tc["name"], "type": "category",
-                    "output": f"ERROR: {e}", "passed": False, "time": elapsed,
-                })
+                results["test_results"].append(
+                    {
+                        "name": tc["name"],
+                        "type": "category",
+                        "output": f"ERROR: {e}",
+                        "passed": False,
+                        "time": elapsed,
+                    }
+                )
 
         results["total_time"] = total_time
         results["average_time"] = total_time / total_cases
@@ -300,7 +342,11 @@ class ModelComparison:
                 all_results[model] = results
             except Exception as e:
                 print(f"\n❌ Failed to test model {model}: {e}")
-                total_cases = len(self.unit_cases) + len(self.tag_cases) + len(self.category_cases)
+                total_cases = (
+                    len(self.unit_cases)
+                    + len(self.tag_cases)
+                    + len(self.category_cases)
+                )
                 all_results[model] = {
                     "model": model,
                     "error": str(e),
@@ -355,7 +401,7 @@ class ModelComparison:
                 )
 
         print(
-            f"\n⚠️  Note: success rate covers unit conversion, tagging taxonomy rules, and category vocabulary compliance."
+            "\n⚠️  Note: success rate covers unit conversion, tagging taxonomy rules, and category vocabulary compliance."
         )
 
         print("\n🏆 Best performing model:")

@@ -31,16 +31,16 @@ from mealie_translate.translator import RecipeTranslator
 # Prices per 1M tokens (input / output) as of March 2026
 AVAILABLE_MODELS = [
     # gpt-5.4 flagship series
-    "gpt-5.4-nano",   # $0.20 / $1.25
-    "gpt-5.4-mini",   # $0.75 / $4.50
-    "gpt-5.4",        # $2.50 / $15.00
+    "gpt-5.4-nano",  # $0.20 / $1.25
+    "gpt-5.4-mini",  # $0.75 / $4.50
+    "gpt-5.4",  # $2.50 / $15.00
     # gpt-4.1 series
-    "gpt-4.1-nano",   # cheapest in series
-    "gpt-4.1-mini",   # mid-tier
-    "gpt-4.1",        # main model
+    "gpt-4.1-nano",  # cheapest in series
+    "gpt-4.1-mini",  # mid-tier
+    "gpt-4.1",  # main model
     # gpt-4o series (legacy reference)
-    "gpt-4o-mini",    # production default
-    "gpt-4o",         # previous flagship
+    "gpt-4o-mini",  # production default
+    "gpt-4o",  # previous flagship
 ]
 
 # ── Unit conversion tests (harder edge cases) ────────────────────────────────
@@ -154,12 +154,17 @@ CATEGORY_TEST_CASES = [
             "existing_categories": "",
         },
         "expected_categories": ["condiment"],
-        "must_not_include": ["main", "dinner"],  # 'main' is explicitly banned per the prompt
+        "must_not_include": [
+            "main",
+            "dinner",
+        ],  # 'main' is explicitly banned per the prompt
     },
 ]
 
 
-def _run_unit_tests(translator: RecipeTranslator, model_name: str) -> list[dict[str, Any]]:
+def _run_unit_tests(
+    translator: RecipeTranslator, model_name: str
+) -> list[dict[str, Any]]:
     """Run unit conversion tests and return per-test results."""
     results = []
     for i, tc in enumerate(UNIT_TEST_CASES, 1):
@@ -182,26 +187,40 @@ def _run_unit_tests(translator: RecipeTranslator, model_name: str) -> list[dict[
             print(f"   Status:   {status}  ({elapsed:.2f}s)")
             if missing:
                 print(f"   Missing:  {missing}")
-            results.append({
-                "name": tc["name"], "input": tc["input"],
-                "expected": tc["expected_output"], "output": output,
-                "found": found, "missing": missing,
-                "status": status, "time": elapsed,
-            })
+            results.append(
+                {
+                    "name": tc["name"],
+                    "input": tc["input"],
+                    "expected": tc["expected_output"],
+                    "output": output,
+                    "found": found,
+                    "missing": missing,
+                    "status": status,
+                    "time": elapsed,
+                }
+            )
         except Exception as e:
             elapsed = time.time() - start
             print(f"   Output:   ERROR — {e}")
             print(f"   Status:   ❌ ERROR  ({elapsed:.2f}s)")
-            results.append({
-                "name": tc["name"], "input": tc["input"],
-                "expected": tc["expected_output"], "output": f"ERROR: {e}",
-                "found": [], "missing": tc["key_elements"],
-                "status": "❌ ERROR", "time": elapsed,
-            })
+            results.append(
+                {
+                    "name": tc["name"],
+                    "input": tc["input"],
+                    "expected": tc["expected_output"],
+                    "output": f"ERROR: {e}",
+                    "found": [],
+                    "missing": tc["key_elements"],
+                    "status": "❌ ERROR",
+                    "time": elapsed,
+                }
+            )
     return results
 
 
-def _run_tag_tests(translator: RecipeTranslator, model_name: str) -> list[dict[str, Any]]:
+def _run_tag_tests(
+    translator: RecipeTranslator, model_name: str
+) -> list[dict[str, Any]]:
     """Run tagging tests and return per-test results."""
     results = []
     for i, tc in enumerate(TAG_TEST_CASES, 1):
@@ -212,7 +231,9 @@ def _run_tag_tests(translator: RecipeTranslator, model_name: str) -> list[dict[s
             output = translator._call_openai(prompt, model_name)
             elapsed = time.time() - start
             tags_raw = [t.strip().lower() for t in output.split(",") if t.strip()]
-            missing_expected = [t for t in tc["expected_tags"] if not any(t in tag for tag in tags_raw)]
+            missing_expected = [
+                t for t in tc["expected_tags"] if not any(t in tag for tag in tags_raw)
+            ]
             violations = [w for w in tc["forbidden"] if w in tags_raw]
             if not missing_expected and not violations:
                 status = "✅ PASSED"
@@ -225,25 +246,41 @@ def _run_tag_tests(translator: RecipeTranslator, model_name: str) -> list[dict[s
             if missing_expected:
                 print(f"   Missing tags:   {missing_expected}")
             if violations:
-                print(f"   CAT violations: {violations}  ← category words used as tags!")
-            results.append({
-                "name": tc["name"], "output": output, "tags": tags_raw,
-                "missing_expected": missing_expected, "violations": violations,
-                "status": status, "time": elapsed,
-            })
+                print(
+                    f"   CAT violations: {violations}  ← category words used as tags!"
+                )
+            results.append(
+                {
+                    "name": tc["name"],
+                    "output": output,
+                    "tags": tags_raw,
+                    "missing_expected": missing_expected,
+                    "violations": violations,
+                    "status": status,
+                    "time": elapsed,
+                }
+            )
         except Exception as e:
             elapsed = time.time() - start
             print(f"   Output:   ERROR — {e}")
             print(f"   Status:   ❌ ERROR  ({elapsed:.2f}s)")
-            results.append({
-                "name": tc["name"], "output": f"ERROR: {e}",
-                "tags": [], "missing_expected": tc["expected_tags"],
-                "violations": [], "status": "❌ ERROR", "time": elapsed,
-            })
+            results.append(
+                {
+                    "name": tc["name"],
+                    "output": f"ERROR: {e}",
+                    "tags": [],
+                    "missing_expected": tc["expected_tags"],
+                    "violations": [],
+                    "status": "❌ ERROR",
+                    "time": elapsed,
+                }
+            )
     return results
 
 
-def _run_category_tests(translator: RecipeTranslator, model_name: str) -> list[dict[str, Any]]:
+def _run_category_tests(
+    translator: RecipeTranslator, model_name: str
+) -> list[dict[str, Any]]:
     """Run categorisation tests and return per-test results."""
     results = []
     for i, tc in enumerate(CATEGORY_TEST_CASES, 1):
@@ -255,7 +292,9 @@ def _run_category_tests(translator: RecipeTranslator, model_name: str) -> list[d
             elapsed = time.time() - start
             cats_raw = [c.strip().lower() for c in output.split(",") if c.strip()]
             vocab_violations = [c for c in cats_raw if c not in ALLOWED_CATEGORIES]
-            missing_expected = [c for c in tc["expected_categories"] if c not in cats_raw]
+            missing_expected = [
+                c for c in tc["expected_categories"] if c not in cats_raw
+            ]
             wrong_assigned = [c for c in tc["must_not_include"] if c in cats_raw]
             if not vocab_violations and not missing_expected and not wrong_assigned:
                 status = "✅ PASSED"
@@ -268,26 +307,39 @@ def _run_category_tests(translator: RecipeTranslator, model_name: str) -> list[d
             if missing_expected:
                 print(f"   Missing cats: {missing_expected}")
             if vocab_violations:
-                print(f"   Vocab errors: {vocab_violations}  ← not in ALLOWED_CATEGORIES!")
+                print(
+                    f"   Vocab errors: {vocab_violations}  ← not in ALLOWED_CATEGORIES!"
+                )
             if wrong_assigned:
                 print(f"   Wrong cats:   {wrong_assigned}")
-            results.append({
-                "name": tc["name"], "output": output, "categories": cats_raw,
-                "missing_expected": missing_expected,
-                "vocab_violations": vocab_violations,
-                "wrong_assigned": wrong_assigned,
-                "status": status, "time": elapsed,
-            })
+            results.append(
+                {
+                    "name": tc["name"],
+                    "output": output,
+                    "categories": cats_raw,
+                    "missing_expected": missing_expected,
+                    "vocab_violations": vocab_violations,
+                    "wrong_assigned": wrong_assigned,
+                    "status": status,
+                    "time": elapsed,
+                }
+            )
         except Exception as e:
             elapsed = time.time() - start
             print(f"   Output:   ERROR — {e}")
             print(f"   Status:   ❌ ERROR  ({elapsed:.2f}s)")
-            results.append({
-                "name": tc["name"], "output": f"ERROR: {e}",
-                "categories": [], "missing_expected": tc["expected_categories"],
-                "vocab_violations": [], "wrong_assigned": [],
-                "status": "❌ ERROR", "time": elapsed,
-            })
+            results.append(
+                {
+                    "name": tc["name"],
+                    "output": f"ERROR: {e}",
+                    "categories": [],
+                    "missing_expected": tc["expected_categories"],
+                    "vocab_violations": [],
+                    "wrong_assigned": [],
+                    "status": "❌ ERROR",
+                    "time": elapsed,
+                }
+            )
     return results
 
 
@@ -334,9 +386,24 @@ def test_single_model(model_name: str, settings) -> dict[str, Any]:
             "failed": u_fail + t_fail + c_fail,
             "total_time": total_time,
             "avg_time": total_time / total,
-            "units": {"pass": u_pass, "partial": u_part, "fail": u_fail, "total": len(unit_results)},
-            "tags":  {"pass": t_pass, "partial": t_part, "fail": t_fail, "total": len(tag_results)},
-            "cats":  {"pass": c_pass, "partial": c_part, "fail": c_fail, "total": len(cat_results)},
+            "units": {
+                "pass": u_pass,
+                "partial": u_part,
+                "fail": u_fail,
+                "total": len(unit_results),
+            },
+            "tags": {
+                "pass": t_pass,
+                "partial": t_part,
+                "fail": t_fail,
+                "total": len(tag_results),
+            },
+            "cats": {
+                "pass": c_pass,
+                "partial": c_part,
+                "fail": c_fail,
+                "total": len(cat_results),
+            },
         },
     }
 
@@ -382,23 +449,47 @@ def print_comparison_summary(all_results: list[dict[str, Any]]):
         best = sorted_results[0]
         s = best["summary"]
         print(f"\n🏆 Best Overall: {best['model']}")
-        print(f"   Pass rate: {(s['passed'] / s['total']) * 100:.1f}%  |  Avg: {s['avg_time']:.2f}s")
+        print(
+            f"   Pass rate: {(s['passed'] / s['total']) * 100:.1f}%  |  Avg: {s['avg_time']:.2f}s"
+        )
 
         print("\n🔍 Detailed — Unit Conversion:")
         for t in best["unit_results"]:
-            icon = "✅" if t["status"] == "✅ PASSED" else "🟡" if "PARTIAL" in t["status"] else "❌"
+            icon = (
+                "✅"
+                if t["status"] == "✅ PASSED"
+                else "🟡"
+                if "PARTIAL" in t["status"]
+                else "❌"
+            )
             print(f"   {icon} {t['name']}: {t['output'][:70]}")
 
         print("\n🔍 Detailed — Tagging:")
         for t in best["tag_results"]:
-            icon = "✅" if t["status"] == "✅ PASSED" else "🟡" if "PARTIAL" in t["status"] else "❌"
+            icon = (
+                "✅"
+                if t["status"] == "✅ PASSED"
+                else "🟡"
+                if "PARTIAL" in t["status"]
+                else "❌"
+            )
             extra = f"  ⚠️  violations: {t['violations']}" if t.get("violations") else ""
             print(f"   {icon} {t['name']}: {t['output'][:60]}{extra}")
 
         print("\n🔍 Detailed — Categorisation:")
         for t in best["cat_results"]:
-            icon = "✅" if t["status"] == "✅ PASSED" else "🟡" if "PARTIAL" in t["status"] else "❌"
-            extra = f"  ⚠️  vocab errors: {t['vocab_violations']}" if t.get("vocab_violations") else ""
+            icon = (
+                "✅"
+                if t["status"] == "✅ PASSED"
+                else "🟡"
+                if "PARTIAL" in t["status"]
+                else "❌"
+            )
+            extra = (
+                f"  ⚠️  vocab errors: {t['vocab_violations']}"
+                if t.get("vocab_violations")
+                else ""
+            )
             print(f"   {icon} {t['name']}: {t['output'][:60]}{extra}")
 
 
@@ -426,7 +517,9 @@ def main():
         if all_results:
             print_comparison_summary(all_results)
 
-        print("\n💡 To add or remove models, edit the AVAILABLE_MODELS list at the top of this file.")
+        print(
+            "\n💡 To add or remove models, edit the AVAILABLE_MODELS list at the top of this file."
+        )
 
         return True
 
