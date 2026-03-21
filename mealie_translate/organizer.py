@@ -245,6 +245,19 @@ class OrganizerGenerator(ABC):
             self.logger.info(f"Created new {self.organizer_name}: '{name}'")
             return new_item
         except Exception as e:
+            self.logger.warning(
+                f"POST to create {self.organizer_name} '{name}' failed ({e}); "
+                "refreshing cache in case it already exists"
+            )
+            # Mealie returns 500 when the name is a duplicate — bust the cache
+            # and retry the lookup before giving up.
+            self._cache.clear()
+            refreshed = self.load_existing()
+            if key in refreshed:
+                self.logger.debug(
+                    f"{self.organizer_name} '{name}' already existed; using it"
+                )
+                return refreshed[key]
             self.logger.error(f"Failed to create {self.organizer_name} '{name}': {e}")
             return None
 

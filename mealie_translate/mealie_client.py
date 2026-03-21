@@ -32,7 +32,7 @@ class MealieClient:
         retry_strategy = Retry(
             total=3,
             backoff_factor=1,
-            status_forcelist=[429, 500, 502, 503, 504],
+            status_forcelist=[429, 502, 503, 504],
         )
 
         adapter = HTTPAdapter(max_retries=retry_strategy)
@@ -182,12 +182,12 @@ class MealieClient:
 
         except requests.RequestException as e:
             self.logger.error(f"Error updating recipe {recipe_slug}: {e}")
-            if hasattr(e, "response") and e.response:
+            if hasattr(e, "response") and e.response is not None:
+                self.logger.error(f"Response status: {e.response.status_code}")
                 try:
                     error_detail = e.response.json()
                     self.logger.error(f"API error details: {error_detail}")
                 except (ValueError, AttributeError):
-                    self.logger.error(f"Response status: {e.response.status_code}")
                     self.logger.error(f"Response text: {e.response.text[:500]}")
             raise
 

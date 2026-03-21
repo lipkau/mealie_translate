@@ -148,18 +148,17 @@ class RecipeProcessor:
             # Translate the recipe
             translated_recipe = self.translator.translate_recipe(recipe)
 
+            # Embed the processed flag directly in the payload so we don't
+            # need a second API round-trip to mark_recipe_as_processed.
+            if "extras" not in translated_recipe:
+                translated_recipe["extras"] = {}
+            translated_recipe["extras"]["translated"] = "true"
+
             # Update the recipe
             success = self.mealie_client.update_recipe(recipe_slug, translated_recipe)
             if not success:
                 self.logger.error(f"Failed to update recipe: {recipe_slug}")
                 return False
-
-            # Mark as processed
-            mark_success = self.mealie_client.mark_recipe_as_processed(recipe_slug)
-            if not mark_success:
-                self.logger.warning(
-                    f"Failed to mark recipe as processed: {recipe_slug}"
-                )
 
             self.logger.info(f"Successfully processed recipe: {recipe_slug}")
             return True
@@ -224,6 +223,12 @@ class RecipeProcessor:
                 # Translate the recipe
                 translated_recipe = self.translator.translate_recipe(full_recipe)
 
+                # Embed the processed flag directly in the payload so we don't
+                # need a second API round-trip to mark_recipe_as_processed.
+                if "extras" not in translated_recipe:
+                    translated_recipe["extras"] = {}
+                translated_recipe["extras"]["translated"] = "true"
+
                 # Update the recipe in Mealie
                 success = self.mealie_client.update_recipe(
                     recipe_slug, translated_recipe
@@ -232,13 +237,6 @@ class RecipeProcessor:
                     self.logger.error(f"Failed to update recipe: {recipe_slug}")
                     stats["failed"] += 1
                     continue
-
-                # Mark as processed
-                mark_success = self.mealie_client.mark_recipe_as_processed(recipe_slug)
-                if not mark_success:
-                    self.logger.warning(
-                        f"Failed to mark recipe as processed: {recipe_slug}"
-                    )
 
                 stats["processed"] += 1
                 self.logger.info(

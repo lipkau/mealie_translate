@@ -88,7 +88,7 @@ class TestRecipeProcessorIntegration:
             mock_client.update_recipe.assert_called_once_with(
                 "test-recipe", translated_recipe
             )
-            mock_client.mark_recipe_as_processed.assert_called_once_with("test-recipe")
+            mock_client.mark_recipe_as_processed.assert_not_called()
 
     def test_recipe_processing_with_failures(self, mock_settings):
         """Test recipe processing when some recipes fail."""
