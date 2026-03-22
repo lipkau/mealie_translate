@@ -16,28 +16,39 @@ def setup_logging(
     Returns:
         Configured logger
     """
-    # Create logger
-    logger = logging.getLogger("mealie_translator")
-    logger.setLevel(getattr(logging, log_level.upper()))
+    level = getattr(logging, log_level.upper())
 
-    # Create formatters
-    console_formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
+    # Configure the root logger so every logger in the process inherits
+    # the handler and level — including module-level loggers that use
+    # get_logger(__name__) with names like 'mealie_translate.main'.
+    root = logging.getLogger()
+    root.setLevel(level)
 
-    # Console handler
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(console_formatter)
-    logger.addHandler(console_handler)
+    # Add console handler only once — check specifically for a StreamHandler
+    # targeting stdout. pytest adds its own handlers to root, so `if not
+    # root.handlers` would be False in tests even when ours isn't there yet.
+    has_stdout_handler = any(type(h) is logging.StreamHandler for h in root.handlers)
+    if not has_stdout_handler:
+        console_formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(level)
+        console_handler.setFormatter(console_formatter)
+        root.addHandler(console_handler)
 
-    # File handler (optional)
     if log_file:
+        console_formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
         file_handler = logging.FileHandler(log_file)
         file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(console_formatter)
-        logger.addHandler(file_handler)
+        root.addHandler(file_handler)
 
+    # Also keep the named logger for backwards compatibility.
+    logger = logging.getLogger("mealie_translator")
+    logger.setLevel(level)
     return logger
 
 

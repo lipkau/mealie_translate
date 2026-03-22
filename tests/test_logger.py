@@ -4,7 +4,26 @@ import logging
 import os
 import tempfile
 
+import pytest
+
 from mealie_translate.logger import get_logger, setup_logging
+
+
+@pytest.fixture(autouse=True)
+def reset_logging():
+    """Ensure a clean root-logger state for every logging test."""
+    root = logging.getLogger()
+    original_level = root.level
+    # Remove ALL handlers before the test so each test starts clean.
+    for h in root.handlers[:]:
+        h.close()
+        root.removeHandler(h)
+    yield
+    # Restore after the test.
+    for h in root.handlers[:]:
+        h.close()
+        root.removeHandler(h)
+    root.setLevel(original_level)
 
 
 def test_get_logger():
@@ -75,7 +94,8 @@ def test_setup_logging_basic():
     assert logger is not None
     assert logger.name == "mealie_translator"
     assert logger.level == logging.INFO
-    assert len(logger.handlers) >= 1
+    # Handlers are attached to the root logger
+    assert len(logging.getLogger().handlers) >= 1
 
 
 def test_setup_logging_with_debug_level():
@@ -114,14 +134,14 @@ def test_setup_logging_with_file():
     try:
         logger = setup_logging(log_file=temp_path)
 
-        # Should have both console and file handlers
-        assert len(logger.handlers) >= 2
+        # Handlers live on root logger — console + file
+        assert len(logging.getLogger().handlers) >= 2
 
         # Test that logging to file works
         logger.info("Test file logging")
 
         # Force flush handlers
-        for handler in logger.handlers:
+        for handler in logging.getLogger().handlers:
             handler.flush()
 
         # Check file exists and has content
@@ -137,12 +157,13 @@ def test_setup_logging_with_file():
 
 def test_setup_logging_console_handler_format():
     """Test console handler format in setup_logging."""
-    logger = setup_logging()
+    setup_logging()
 
-    # Find console handler
+    # Find console handler on the root logger.
+    # Use exact type check — FileHandler is a subclass of StreamHandler.
     console_handler = None
-    for handler in logger.handlers:
-        if isinstance(handler, logging.StreamHandler):
+    for handler in logging.getLogger().handlers:
+        if type(handler) is logging.StreamHandler:
             console_handler = handler
             break
 
@@ -172,11 +193,11 @@ def test_setup_logging_file_handler_format():
         temp_path = temp_file.name
 
     try:
-        logger = setup_logging(log_file=temp_path)
+        setup_logging(log_file=temp_path)
 
-        # Find file handler
+        # Find file handler on the root logger
         file_handler = None
-        for handler in logger.handlers:
+        for handler in logging.getLogger().handlers:
             if isinstance(handler, logging.FileHandler):
                 file_handler = handler
                 break
@@ -192,11 +213,11 @@ def test_setup_logging_file_handler_format():
 
 def test_console_handler_level():
     """Test console handler has INFO level."""
-    logger = setup_logging()
+    setup_logging()
 
     console_handler = None
-    for handler in logger.handlers:
-        if isinstance(handler, logging.StreamHandler):
+    for handler in logging.getLogger().handlers:
+        if type(handler) is logging.StreamHandler:
             console_handler = handler
             break
 

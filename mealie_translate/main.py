@@ -4,13 +4,14 @@
 import argparse
 
 from .config import get_settings
-from .logger import get_logger
+from .logger import get_logger, setup_logging
 from .organizer import RecipeOrganizer
 from .recipe_processor import RecipeProcessor
 
 
 def main():
     """Main application entry point."""
+    setup_logging()
     logger = get_logger(__name__)
 
     parser = argparse.ArgumentParser(
