@@ -415,3 +415,18 @@ with:
 3. **vuln-type: "os,library"** — Focus on actual security issues, not configuration
 
 **Result**: Dramatically reduced alert volume while maintaining coverage for actionable security issues.
+
+### Dismissing Stale Alerts
+
+For existing alerts that accumulated before filtering was enabled, use the maintenance workflow:
+
+```bash
+# Dismiss alerts older than 30 days (default)
+gh workflow run maintenance.yml -f dismiss_alerts=true
+
+# Dismiss alerts older than 7 days
+gh workflow run maintenance.yml -f dismiss_alerts=true -f alert_age_days=7
+```
+
+This will bulk dismiss old Trivy alerts with the reason "won't fix" and a comment explaining they are
+stale base image CVEs. The workflow only runs when manually triggered with `dismiss_alerts=true`.
