@@ -131,3 +131,121 @@ async def test_process_single_recipe_success(processor):
     assert result is True
     processor.translator.translate_recipe.assert_called_once()
     processor.mealie_client.update_recipe.assert_called_once()
+
+
+# --- Dry Run Tests ---
+
+
+@pytest.fixture
+def dry_run_settings():
+    """Create settings with dry_run enabled."""
+    return Settings(
+        mealie_base_url="https://test.mealie.com",
+        mealie_api_token="test_token",
+        openai_api_key="test_openai_key",
+        target_language="English",
+        dry_run=True,
+    )
+
+
+@pytest.fixture
+def dry_run_processor(dry_run_settings):
+    """Create a RecipeProcessor instance with dry_run enabled."""
+    with (
+        patch("mealie_translate.recipe_processor.MealieClient") as mock_client_class,
+        patch(
+            "mealie_translate.recipe_processor.RecipeTranslator"
+        ) as mock_translator_class,
+    ):
+        mock_client = MagicMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+        mock_client_class.return_value = mock_client
+
+        mock_translator = MagicMock()
+        mock_translator_class.return_value = mock_translator
+
+        proc = RecipeProcessor(dry_run_settings, dry_run=True)
+        proc.mealie_client = mock_client
+        proc.translator = mock_translator
+        return proc
+
+
+async def test_dry_run_does_not_update_recipe(dry_run_processor):
+    """Test that dry_run mode does not call update_recipe."""
+    recipe_data = {
+        "slug": "test-recipe",
+        "name": "Test Recipe",
+        "description": "A test recipe",
+        "extras": {},
+    }
+    translated_recipe = {
+        "slug": "test-recipe",
+        "name": "Translated Recipe",
+        "description": "A translated recipe",
+        "extras": {},
+    }
+
+    dry_run_processor.mealie_client.get_recipe_details = AsyncMock(
+        return_value=recipe_data
+    )
+    dry_run_processor.mealie_client.is_recipe_processed = MagicMock(return_value=False)
+    dry_run_processor.mealie_client.update_recipe = AsyncMock(return_value=True)
+    dry_run_processor.translator.translate_recipe = AsyncMock(
+        return_value=translated_recipe
+    )
+
+    result = await dry_run_processor.process_single_recipe("test-recipe")
+
+    assert result is True
+    dry_run_processor.translator.translate_recipe.assert_called_once()
+    dry_run_processor.mealie_client.update_recipe.assert_not_called()
+
+
+async def test_dry_run_batch_does_not_update(dry_run_processor):
+    """Test that dry_run mode in batch processing does not call update_recipe."""
+    recipe = {
+        "slug": "test-recipe",
+        "name": "Test Recipe",
+        "extras": {},
+    }
+    translated_recipe = {
+        "slug": "test-recipe",
+        "name": "Translated Recipe",
+        "extras": {},
+    }
+
+    dry_run_processor.mealie_client.is_recipe_processed = MagicMock(return_value=False)
+    dry_run_processor.mealie_client.update_recipe = AsyncMock(return_value=True)
+    dry_run_processor.translator.translate_recipe = AsyncMock(
+        return_value=translated_recipe
+    )
+
+    result = await dry_run_processor._process_single_recipe_in_batch(recipe)
+
+    assert result["status"] == "processed"
+    dry_run_processor.translator.translate_recipe.assert_called_once()
+    dry_run_processor.mealie_client.update_recipe.assert_not_called()
+
+
+def test_dry_run_parameter_overrides_settings(mock_settings):
+    """Test that dry_run parameter overrides settings."""
+    with (
+        patch("mealie_translate.recipe_processor.MealieClient"),
+        patch("mealie_translate.recipe_processor.RecipeTranslator"),
+    ):
+        proc = RecipeProcessor(mock_settings, dry_run=True)
+        assert proc.dry_run is True
+
+        proc2 = RecipeProcessor(mock_settings, dry_run=False)
+        assert proc2.dry_run is False
+
+
+def test_dry_run_from_settings(dry_run_settings):
+    """Test that dry_run is read from settings when not passed as parameter."""
+    with (
+        patch("mealie_translate.recipe_processor.MealieClient"),
+        patch("mealie_translate.recipe_processor.RecipeTranslator"),
+    ):
+        proc = RecipeProcessor(dry_run_settings)
+        assert proc.dry_run is True

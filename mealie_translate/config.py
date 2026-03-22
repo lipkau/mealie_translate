@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     max_concurrent_requests: int = 5  # Max parallel Mealie API calls
     max_concurrent_translations: int = 3  # Max parallel OpenAI API calls
 
+    # Dry Run Configuration
+    dry_run: bool = False
+
     # Scheduling Configuration (for Docker containers)
     cron_schedule: str = "0 */6 * * *"
 

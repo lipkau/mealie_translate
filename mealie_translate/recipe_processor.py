@@ -12,14 +12,16 @@ from .translator import RecipeTranslator
 class RecipeProcessor:
     """Orchestrates the recipe translation process with concurrent processing."""
 
-    def __init__(self, settings: Settings | None = None):
+    def __init__(self, settings: Settings | None = None, dry_run: bool = False):
         """Initialize the recipe processor.
 
         Args:
             settings: Application settings (optional, will load from env if
                 not provided)
+            dry_run: If True, preview changes without saving to Mealie
         """
         self.settings = settings or get_settings()
+        self.dry_run = dry_run or self.settings.dry_run
         self.mealie_client = MealieClient(self.settings)
         self.translator = RecipeTranslator(self.settings)
         self.logger = get_logger(__name__)
@@ -171,6 +173,12 @@ class RecipeProcessor:
                 translated_recipe["extras"] = {}
             translated_recipe["extras"]["translated"] = "true"
 
+            if self.dry_run:
+                self.logger.info(
+                    f"[DRY RUN] Would update recipe: {translated_recipe.get('name', recipe_slug)}"
+                )
+                return True
+
             success = await self.mealie_client.update_recipe(
                 recipe_slug, translated_recipe
             )
@@ -233,6 +241,12 @@ class RecipeProcessor:
             if "extras" not in translated_recipe:
                 translated_recipe["extras"] = {}
             translated_recipe["extras"]["translated"] = "true"
+
+            if self.dry_run:
+                self.logger.info(
+                    f"[DRY RUN] Would update: {translated_recipe.get('name', recipe_slug)}"
+                )
+                return {"status": "processed", "name": translated_recipe.get("name")}
 
             async with self._mealie_semaphore:
                 success = await self.mealie_client.update_recipe(
