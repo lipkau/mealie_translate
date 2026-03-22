@@ -15,7 +15,6 @@ LABEL org.opencontainers.image.documentation="https://github.com/lipkau/mealie_t
 ENV PYTHONDONTWRITEBYTECODE=1 \
   PYTHONUNBUFFERED=1 \
   PYTHONPATH=/app \
-  PIP_NO_CACHE_DIR=1 \
   PIP_DISABLE_PIP_VERSION_CHECK=1
 
 # Install system dependencies
@@ -49,8 +48,9 @@ FROM base AS development
 USER app
 ENV PATH=$PATH:/home/app/.local/bin
 
-# Install development dependencies (now source code is available for editable install)
-RUN pip install -e .[dev]
+# Install development dependencies with pip cache for faster rebuilds
+RUN --mount=type=cache,target=/home/app/.cache/pip,uid=1000,gid=1000 \
+  pip install -e .[dev]
 
 # Copy remaining files (like tests, docs, etc.)
 COPY --chown=app:app . ./
@@ -67,12 +67,13 @@ CMD ["python", "main.py"]
 # Stage 3: Production image (lightweight)
 FROM base AS production
 
-# Install production dependencies globally (as root for cron access)
-RUN pip install .
+# Install production dependencies with pip cache for faster rebuilds
+RUN --mount=type=cache,target=/root/.cache/pip \
+  pip install .
 
-# Health check using our module structure
+# Health check verifies configuration is valid (required env vars are set)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD python -c "import mealie_translate" || exit 1
+  CMD python -c "from mealie_translate.config import get_settings; s=get_settings(); assert s.mealie_base_url and s.mealie_api_token and s.openai_api_key, 'Missing required config'" || exit 1
 
 # Production command - use our entry script for cron scheduling
 CMD ["/usr/local/bin/docker-entrypoint.sh"]
