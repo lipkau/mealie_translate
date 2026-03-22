@@ -49,9 +49,11 @@ jobs:
     name: Python Code Security
     runs-on: ubuntu-latest
     if: |
-      github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'schedule' ||
-      (github.event_name == 'workflow_run' && needs.check-cd-status.outputs.should-scan == 'true')
+      !cancelled() && (
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'schedule' ||
+        (github.event_name == 'workflow_run' && needs.check-cd-status.outputs.should-scan == 'true')
+      )
     needs: [check-cd-status]
     continue-on-error: false
     permissions:
@@ -179,9 +181,11 @@ jobs:
     name: Docker Image Security (dev)
     runs-on: ubuntu-latest
     if: |
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.image_tag == 'dev') ||
-      (github.event_name == 'schedule') ||
-      (github.event_name == 'workflow_run' && needs.check-cd-status.outputs.should-scan == 'true' && github.event.workflow_run.head_branch == 'main')
+      !cancelled() && (
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.image_tag == 'dev') ||
+        (github.event_name == 'schedule') ||
+        (github.event_name == 'workflow_run' && needs.check-cd-status.outputs.should-scan == 'true' && github.event.workflow_run.head_branch == 'main')
+      )
     needs: [check-cd-status]
     continue-on-error: false
 
@@ -229,9 +233,11 @@ jobs:
     name: Docker Image Security (latest)
     runs-on: ubuntu-latest
     if: |
-      (github.event_name == 'workflow_dispatch' && (github.event.inputs.image_tag == 'latest' || github.event.inputs.image_tag == '')) ||
-      (github.event_name == 'schedule') ||
-      (github.event_name == 'workflow_run' && needs.check-cd-status.outputs.should-scan == 'true' && startsWith(github.event.workflow_run.head_branch, 'v'))
+      !cancelled() && (
+        (github.event_name == 'workflow_dispatch' && (github.event.inputs.image_tag == 'latest' || github.event.inputs.image_tag == '')) ||
+        (github.event_name == 'schedule') ||
+        (github.event_name == 'workflow_run' && needs.check-cd-status.outputs.should-scan == 'true' && startsWith(github.event.workflow_run.head_branch, 'v'))
+      )
     needs: [check-cd-status]
     continue-on-error: false
 
@@ -279,9 +285,11 @@ jobs:
     name: Docker Scout Security Analysis
     runs-on: ubuntu-latest
     if: |
-      (github.event_name == 'workflow_dispatch') ||
-      (github.event_name == 'schedule') ||
-      (github.event_name == 'workflow_run' && needs.check-cd-status.outputs.should-scan == 'true')
+      !cancelled() && (
+        (github.event_name == 'workflow_dispatch') ||
+        (github.event_name == 'schedule') ||
+        (github.event_name == 'workflow_run' && needs.check-cd-status.outputs.should-scan == 'true')
+      )
     needs: [check-cd-status]
     continue-on-error: true # Don't fail the whole pipeline if Scout has issues
 
@@ -372,9 +380,11 @@ jobs:
     name: Trivy Security Analysis (Fallback)
     runs-on: ubuntu-latest
     if: |
-      (github.event_name == 'workflow_dispatch') ||
-      (github.event_name == 'schedule') ||
-      (github.event_name == 'workflow_run' && needs.check-cd-status.outputs.should-scan == 'true')
+      !cancelled() && (
+        (github.event_name == 'workflow_dispatch') ||
+        (github.event_name == 'schedule') ||
+        (github.event_name == 'workflow_run' && needs.check-cd-status.outputs.should-scan == 'true')
+      )
     needs: [check-cd-status]
     continue-on-error: true
 
