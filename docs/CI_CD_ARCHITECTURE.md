@@ -11,9 +11,9 @@ This project uses a separated CI/CD architecture with two distinct workflows for
 **Jobs**:
 
 - **Markdown Linting**: Documentation quality checks (Node.js)
-- **Code Quality & Security**: Linting and security scanning (Python 3.13)
-- **Test Coverage**: Unit tests with coverage analysis (Python 3.13)
-- **Test Matrix**: Compatibility tests across Python 3.11, 3.12, 3.13
+- **Code Quality & Security**: Linting and security scanning (Python 3.14)
+- **Test Coverage**: Unit tests with coverage analysis (Python 3.14)
+- **Test Matrix**: Compatibility tests across Python 3.11, 3.12, 3.13, 3.14
 - **Docker Build Test**: Validates Docker image builds without publishing
 - **Integration Tests**: Runs on main branch pushes and PRs with special label
 

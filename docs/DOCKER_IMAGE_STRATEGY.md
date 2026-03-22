@@ -111,11 +111,11 @@ Git tags are automatically sanitized for Docker compatibility:
 
 ```dockerfile
 # Development target (includes dev dependencies)
-FROM python:3.11-slim as development
+FROM python:3.14-slim-trixie as development
 RUN pip install --no-cache-dir -e .[dev]
 
 # Production target (minimal dependencies)
-FROM python:3.11-slim as production
+FROM python:3.14-slim-trixie as production
 RUN pip install --no-cache-dir .
 ```
 

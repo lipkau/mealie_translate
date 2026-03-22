@@ -126,7 +126,7 @@ Examples:
 
 The Dockerfile uses a multi-stage build process:
 
-1. **Base Stage**: Python 3.13 with system dependencies
+1. **Base Stage**: Python 3.14 with system dependencies
 2. **Development Stage**: Includes dev dependencies and testing tools
 3. **Production Stage**: Lightweight image with only runtime dependencies
 4. **Testing Stage**: Runs tests during build (optional)

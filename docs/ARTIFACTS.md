@@ -20,7 +20,7 @@ Our CI/CD pipelines capture comprehensive artifacts for debugging, compliance, a
 - **Features**:
   - Published to GitHub's test results UI via `dorny/test-reporter`
   - Codecov integration for coverage tracking
-  - Generated on Python 3.13 (latest stable)
+  - Generated on Python 3.14 (latest stable)
 - **Size**: ~1-5 MB
 
 ### Test Matrix Results
@@ -32,7 +32,7 @@ Our CI/CD pipelines capture comprehensive artifacts for debugging, compliance, a
 - **Usage**: Python version compatibility validation, debugging version-specific issues
 - **Features**:
   - Published to GitHub's test results UI via `dorny/test-reporter`
-  - Separate artifacts per Python version (3.11, 3.12, 3.13)
+  - Separate artifacts per Python version (3.11, 3.12, 3.13, 3.14)
   - Focused on compatibility, not coverage
 - **Size**: ~100 KB per version
 
