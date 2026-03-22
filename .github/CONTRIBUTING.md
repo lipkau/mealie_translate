@@ -62,7 +62,7 @@ Enhancement suggestions are welcome! Please use the feature request template and
 
 ### Prerequisites
 
-- Python 3.11+ (Recommended: 3.13.0 - see [README](../README.md#python-version-management))
+- Python 3.11+ (Recommended: 3.14 - see [README](../README.md#local-development))
 - Git
 - OpenAI API key for testing (optional)
 - Docker (optional, for containerized development)

@@ -52,7 +52,7 @@ PIP := $(VENV_PATH)/bin/pip
 
 # Python version requirements
 REQUIRED_PYTHON_VERSION := 3.11
-PREFERRED_PYTHON_VERSION := 3.13.0
+PREFERRED_PYTHON_VERSION := 3.14.0
 
 # Check if pyenv is available and .python-version exists
 PYENV_AVAILABLE := $(shell command -v pyenv 2> /dev/null)

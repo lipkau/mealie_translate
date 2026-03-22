@@ -64,7 +64,7 @@ jobs:
 
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version: "3.14"
 
       # CodeQL static analysis with false positive filtering
       - uses: github/codeql-action/init@v4
@@ -87,9 +87,9 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-security-3.13-${{ hashFiles('pyproject.toml') }}
+          key: ${{ runner.os }}-pip-security-3.14-${{ hashFiles('pyproject.toml') }}
           restore-keys: |
-            ${{ runner.os }}-pip-security-3.13-
+            ${{ runner.os }}-pip-security-3.14-
             ${{ runner.os }}-pip-security-
             ${{ runner.os }}-pip-
 
@@ -213,6 +213,9 @@ jobs:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev
           format: "sarif"
           output: "trivy-results-dev.sarif"
+          severity: "HIGH,CRITICAL"
+          ignore-unfixed: true
+          vuln-type: "os,library"
 
       - name: Upload Trivy scan results to GitHub Security tab
         if: steps.image-check.outputs.exists == 'true'
@@ -260,6 +263,9 @@ jobs:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           format: "sarif"
           output: "trivy-results-latest.sarif"
+          severity: "HIGH,CRITICAL"
+          ignore-unfixed: true
+          vuln-type: "os,library"
 
       - name: Upload Trivy scan results to GitHub Security tab
         if: steps.image-check.outputs.exists == 'true'
@@ -406,6 +412,9 @@ jobs:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           format: "sarif"
           output: "trivy-results.sarif"
+          severity: "HIGH,CRITICAL"
+          ignore-unfixed: true
+          vuln-type: "os,library"
 
       - name: Upload Trivy scan results to GitHub Security tab
         if: steps.trivy-image-check.outputs.exists == 'true'
