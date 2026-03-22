@@ -272,11 +272,19 @@ docker push ghcr.io/lipkau/mealie_translate:custom
 
 The GitHub Actions workflow (`.github/workflows/cd.yml`) handles:
 
+- ✅ Multi-platform builds (linux/amd64 + linux/arm64)
 - ✅ Multi-stage builds (dev + production)
 - ✅ Automatic tagging strategy
 - ✅ Security scanning with Trivy
 - ✅ GHCR authentication and publishing
 - ✅ Build caching for faster deployments
+
+### Supported Platforms
+
+Images are built for multiple architectures:
+
+- **linux/amd64**: Intel/AMD x86_64 servers and desktops
+- **linux/arm64**: ARM64 servers (AWS Graviton, Apple Silicon via Docker Desktop)
 
 ## Troubleshooting
 
