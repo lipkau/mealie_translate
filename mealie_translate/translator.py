@@ -3,6 +3,7 @@
 import asyncio
 from typing import Any
 
+import httpx
 from openai import AsyncOpenAI
 
 from .config import Settings
@@ -83,7 +84,11 @@ TEMPERATURE CONVERSION EXAMPLES:
         Args:
             settings: Application settings containing API configuration
         """
-        self.client = AsyncOpenAI(api_key=settings.openai_api_key)
+        http_client = httpx.AsyncClient(http2=True)
+        self.client = AsyncOpenAI(
+            api_key=settings.openai_api_key,
+            http_client=http_client,
+        )
         self.target_language = settings.target_language
         self.max_retries = settings.max_retries
         self.retry_delay = settings.retry_delay

@@ -23,11 +23,13 @@ class MealieClient:
         self.max_retries = settings.max_retries
         self.retry_delay = settings.retry_delay
         self._client: httpx.AsyncClient | None = None
+        self._http_version_logged = False
         self.logger = get_logger(__name__)
 
     async def __aenter__(self) -> "MealieClient":
         """Enter async context manager."""
         self._client = httpx.AsyncClient(
+            http2=True,
             headers={
                 "Authorization": f"Bearer {self.api_token}",
                 "Content-Type": "application/json",
@@ -78,6 +80,9 @@ class MealieClient:
             try:
                 response = await self.client.request(method, url, **kwargs)
                 response.raise_for_status()
+                if not self._http_version_logged:
+                    self.logger.info(f"HTTP protocol: {response.http_version}")
+                    self._http_version_logged = True
                 return response
             except httpx.HTTPStatusError as e:
                 if e.response.status_code in [429, 502, 503, 504]:

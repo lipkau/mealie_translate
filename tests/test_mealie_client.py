@@ -35,6 +35,16 @@ async def test_mealie_client_context_manager(mock_settings):
     assert client._client is None
 
 
+async def test_mealie_client_http2_enabled(mock_settings):
+    """Test MealieClient has HTTP/2 enabled."""
+    async with MealieClient(mock_settings) as client:
+        assert client._client is not None
+        # Access internal transport to verify HTTP/2 configuration
+        transport = client._client._transport
+        assert hasattr(transport, "_pool")
+        assert transport._pool._http2 is True  # type: ignore[union-attr]
+
+
 @respx.mock
 async def test_get_recipe_details_success(mock_settings):
     """Test successful recipe details retrieval."""
