@@ -85,6 +85,7 @@ Set these environment variables:
 | `RETRY_DELAY`                  | Base delay between retries in seconds    | `1`                             |
 | `MAX_CONCURRENT_REQUESTS`      | Max parallel Mealie API calls            | `5`                             |
 | `MAX_CONCURRENT_TRANSLATIONS`  | Max parallel OpenAI API calls            | `3`                             |
+| `DRY_RUN`                      | Preview mode - no changes saved          | `false`                         |
 
 **Getting API tokens:**
 
@@ -119,6 +120,10 @@ python main.py
 
 # Process a specific recipe by slug
 python main.py --recipe my-recipe-slug
+
+# Preview changes without saving (dry run)
+python main.py --dry-run
+python main.py --recipe my-recipe-slug --dry-run
 
 # Use custom config file
 python main.py --config /path/to/.env

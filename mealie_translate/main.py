@@ -23,6 +23,8 @@ Examples:
   python main.py                         # Translate + organise all recipes
   python main.py --recipe my-recipe-slug # Translate + organise a specific recipe
   python main.py --skip-organise         # Translate only, skip tag/category generation
+  python main.py --dry-run               # Preview changes without saving
+  python main.py --recipe my-slug --dry-run  # Preview a single recipe
         """,
     )
 
@@ -38,6 +40,12 @@ Examples:
         "--skip-organise",
         action="store_true",
         help="Skip tag and category generation after translation",
+    )
+
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview changes without modifying recipes in Mealie",
     )
 
     args = parser.parse_args()
@@ -59,8 +67,12 @@ Examples:
 
         logger.info("Configuration loaded successfully")
 
+        dry_run = args.dry_run
+        if dry_run:
+            logger.info("[DRY RUN] Preview mode enabled - no changes will be saved")
+
         if args.recipe:
-            async with RecipeProcessor(settings) as processor:
+            async with RecipeProcessor(settings, dry_run=dry_run) as processor:
                 logger.info(f"Processing specific recipe: {args.recipe}")
                 result = await processor.process_single_recipe(args.recipe)
                 if not result:
@@ -69,17 +81,21 @@ Examples:
                 logger.info(f"Successfully translated recipe: {args.recipe}")
 
             if not args.skip_organise:
-                async with RecipeOrganizer(settings=settings) as organizer:
+                async with RecipeOrganizer(
+                    settings=settings, dry_run=dry_run
+                ) as organizer:
                     logger.info(f"Organising recipe: {args.recipe}")
                     await organizer.process_recipe(args.recipe)
         else:
-            async with RecipeProcessor(settings) as processor:
+            async with RecipeProcessor(settings, dry_run=dry_run) as processor:
                 logger.info("Starting to translate all unprocessed recipes")
                 results = await processor.process_all_recipes()
                 logger.info(f"Translation complete. Results: {results}")
 
             if not args.skip_organise:
-                async with RecipeOrganizer(settings=settings) as organizer:
+                async with RecipeOrganizer(
+                    settings=settings, dry_run=dry_run
+                ) as organizer:
                     logger.info("Starting to organise all recipes (tags + categories)")
                     org_results = await organizer.process_all_recipes()
                     logger.info(f"Organisation complete. Results: {org_results}")
