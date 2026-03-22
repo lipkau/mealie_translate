@@ -216,6 +216,10 @@ OPENAI_MODEL=gpt-4.1-mini
 # Optional: Cron Schedule
 CRON_SCHEDULE=0 */6 * * *
 
+# Optional: Concurrency (tune for API rate limits)
+MAX_CONCURRENT_REQUESTS=5      # Max parallel Mealie API calls
+MAX_CONCURRENT_TRANSLATIONS=3  # Max parallel OpenAI API calls
+
 # Optional: Logging
 LOG_LEVEL=INFO
 ```

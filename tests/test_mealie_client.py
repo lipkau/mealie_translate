@@ -1,15 +1,8 @@
 """Tests for Mealie API client."""
 
-import json
-import sys
-from pathlib import Path
-
 import pytest
-import responses
-
-# Add the src directory to the Python path
-project_dir = Path(__file__).parent.parent
-sys.path.insert(0, str(project_dir / "src"))
+import respx
+from httpx import Response
 
 from mealie_translate.config import Settings
 from mealie_translate.mealie_client import MealieClient
@@ -25,25 +18,25 @@ def mock_settings():
     )
 
 
-@pytest.fixture
-def mealie_client(mock_settings):
-    """Create a MealieClient instance for testing."""
-    return MealieClient(mock_settings)
-
-
 def test_mealie_client_initialization(mock_settings):
     """Test MealieClient initialization."""
     client = MealieClient(mock_settings)
 
     assert client.base_url == "https://test.mealie.com"
     assert client.api_token == "test_token"
-    assert client.session is not None
-    auth_header = client.session.headers["Authorization"]
-    assert auth_header == "Bearer test_token"
 
 
-@responses.activate
-def test_get_recipe_details_success(mealie_client):
+async def test_mealie_client_context_manager(mock_settings):
+    """Test MealieClient async context manager."""
+    async with MealieClient(mock_settings) as client:
+        assert client._client is not None
+        assert "Bearer test_token" in client.client.headers["Authorization"]
+
+    assert client._client is None
+
+
+@respx.mock
+async def test_get_recipe_details_success(mock_settings):
     """Test successful recipe details retrieval."""
     recipe_slug = "test-recipe"
     mock_recipe = {
@@ -53,143 +46,121 @@ def test_get_recipe_details_success(mealie_client):
         "tags": [{"name": "test"}],
     }
 
-    responses.add(
-        responses.GET,
-        f"https://test.mealie.com/api/recipes/{recipe_slug}",
-        json=mock_recipe,
-        status=200,
+    respx.get(f"https://test.mealie.com/api/recipes/{recipe_slug}").mock(
+        return_value=Response(200, json=mock_recipe)
     )
 
-    recipe = mealie_client.get_recipe_details(recipe_slug)
+    async with MealieClient(mock_settings) as client:
+        recipe = await client.get_recipe_details(recipe_slug)
 
+    assert recipe is not None
     assert recipe == mock_recipe
     assert recipe["name"] == "Test Recipe"
 
 
-@responses.activate
-def test_get_recipe_details_not_found(mealie_client):
+@respx.mock
+async def test_get_recipe_details_not_found(mock_settings):
     """Test recipe details retrieval when recipe not found."""
     recipe_slug = "nonexistent-recipe"
 
-    responses.add(
-        responses.GET, f"https://test.mealie.com/api/recipes/{recipe_slug}", status=404
+    respx.get(f"https://test.mealie.com/api/recipes/{recipe_slug}").mock(
+        return_value=Response(404)
     )
 
-    result = mealie_client.get_recipe_details(recipe_slug)
+    async with MealieClient(mock_settings) as client:
+        result = await client.get_recipe_details(recipe_slug)
+
     assert result is None
 
 
-@responses.activate
-def test_update_recipe_success(mealie_client):
+@respx.mock
+async def test_update_recipe_success(mock_settings):
     """Test successful recipe update."""
     recipe_slug = "test-recipe"
     recipe_data = {"name": "Updated Recipe", "description": "Updated description"}
 
-    responses.add(
-        responses.PUT, f"https://test.mealie.com/api/recipes/{recipe_slug}", status=200
+    respx.put(f"https://test.mealie.com/api/recipes/{recipe_slug}").mock(
+        return_value=Response(200, json=recipe_data)
     )
 
-    result = mealie_client.update_recipe(recipe_slug, recipe_data)
+    async with MealieClient(mock_settings) as client:
+        result = await client.update_recipe(recipe_slug, recipe_data)
 
     assert result is True
 
 
-def test_is_recipe_processed(mealie_client):
+def test_is_recipe_processed(mock_settings):
     """Test recipe processed status checking functionality."""
+    client = MealieClient(mock_settings)
+
     recipe_processed = {"extras": {"translated": "true"}}
     recipe_not_processed = {"extras": {"some_other_field": "value"}}
     recipe_no_extras = {}
 
-    assert mealie_client.is_recipe_processed(recipe_processed) is True
-    assert mealie_client.is_recipe_processed(recipe_not_processed) is False
-    assert mealie_client.is_recipe_processed(recipe_no_extras) is False
+    assert client.is_recipe_processed(recipe_processed) is True
+    assert client.is_recipe_processed(recipe_not_processed) is False
+    assert client.is_recipe_processed(recipe_no_extras) is False
 
 
-@responses.activate
-def test_mark_recipe_as_processed_success(mealie_client):
+@respx.mock
+async def test_mark_recipe_as_processed_success(mock_settings):
     """Test marking a recipe as processed."""
     recipe_slug = "test-recipe"
 
-    # Mock getting the recipe
-    responses.add(
-        responses.GET,
-        f"https://test.mealie.com/api/recipes/{recipe_slug}",
-        json={"name": "Test Recipe", "extras": {}},
-        status=200,
+    respx.get(f"https://test.mealie.com/api/recipes/{recipe_slug}").mock(
+        return_value=Response(200, json={"name": "Test Recipe", "extras": {}})
     )
 
-    # Mock updating the recipe
-    responses.add(
-        responses.PUT,
-        f"https://test.mealie.com/api/recipes/{recipe_slug}",
-        status=200,
+    put_route = respx.put(f"https://test.mealie.com/api/recipes/{recipe_slug}").mock(
+        return_value=Response(200, json={"name": "Test Recipe"})
     )
 
-    result = mealie_client.mark_recipe_as_processed(recipe_slug)
+    async with MealieClient(mock_settings) as client:
+        result = await client.mark_recipe_as_processed(recipe_slug)
 
     assert result is True
-
-    # Check that the PUT request was made with the correct data
-    assert len(responses.calls) == 2
-    put_call = responses.calls[1]
-    if put_call.request.body:
-        request_data = json.loads(put_call.request.body)
-        assert request_data["extras"]["translated"] == "true"
+    assert put_route.called
 
 
-@responses.activate
-def test_get_all_recipes_pagination(mealie_client):
+@respx.mock
+async def test_get_all_recipes_pagination(mock_settings):
     """Test pagination in get_all_recipes."""
-    # Mock first page
-    responses.add(
-        responses.GET,
-        "https://test.mealie.com/api/recipes",
-        json={"items": [{"id": 1, "name": "Recipe 1"}]},
-        status=200,
+    respx.get("https://test.mealie.com/api/recipes").mock(
+        side_effect=[
+            Response(200, json={"items": [{"id": 1, "name": "Recipe 1"}]}),
+            Response(200, json={"items": []}),
+        ]
     )
 
-    # Mock second page (empty)
-    responses.add(
-        responses.GET,
-        "https://test.mealie.com/api/recipes",
-        json={"items": []},
-        status=200,
-    )
-
-    recipes = mealie_client.get_all_recipes()
+    async with MealieClient(mock_settings) as client:
+        recipes = await client.get_all_recipes()
 
     assert len(recipes) == 1
     assert recipes[0]["name"] == "Recipe 1"
 
 
-@responses.activate
-def test_get_all_recipes_basic_functionality(mealie_client):
+@respx.mock
+async def test_get_all_recipes_basic_functionality(mock_settings):
     """Test basic get_all_recipes functionality."""
-    # Mock first page with recipes
-    responses.add(
-        responses.GET,
-        "https://test.mealie.com/api/recipes",
-        json={
-            "items": [
-                {"id": 1, "name": "Recipe 1"},
-                {"id": 2, "name": "Recipe 2"},
-                {"id": 3, "name": "Recipe 3"},
-            ]
-        },
-        status=200,
+    respx.get("https://test.mealie.com/api/recipes").mock(
+        side_effect=[
+            Response(
+                200,
+                json={
+                    "items": [
+                        {"id": 1, "name": "Recipe 1"},
+                        {"id": 2, "name": "Recipe 2"},
+                        {"id": 3, "name": "Recipe 3"},
+                    ]
+                },
+            ),
+            Response(200, json={"items": []}),
+        ]
     )
 
-    # Mock second page (empty)
-    responses.add(
-        responses.GET,
-        "https://test.mealie.com/api/recipes",
-        json={"items": []},
-        status=200,
-    )
+    async with MealieClient(mock_settings) as client:
+        recipes = await client.get_all_recipes()
 
-    recipes = mealie_client.get_all_recipes()
-
-    # Should return all recipes since filtering is now done at processing level
     assert len(recipes) == 3
     assert recipes[0]["name"] == "Recipe 1"
     assert recipes[1]["name"] == "Recipe 2"

@@ -1,9 +1,9 @@
 """OpenAI translation service for recipe content."""
 
-import time
+import asyncio
 from typing import Any
 
-from openai import OpenAI
+from openai import AsyncOpenAI
 
 from .config import Settings
 from .logger import get_logger
@@ -12,7 +12,6 @@ from .logger import get_logger
 class RecipeTranslator:
     """Handles translation of recipe content using OpenAI ChatGPT."""
 
-    # Reusable prompt components
     UNIT_CONVERSION_RULES = """
 UNIT CONVERSION RULES:
 Convert ALL imperial units to metric equivalents and ROUND to the nearest multiple of 5.
@@ -60,77 +59,7 @@ TRANSLATION RULES:
 You must preserve the exact structure and format of the input while translating text content AND converting imperial units to metric equivalents.
 Never add explanations, commentary, or modify the format of the response."""
 
-    def __init__(self, settings: Settings):
-        """Initialize the translator.
-
-        Args:
-            settings: Application settings containing API configuration
-        """
-        self.client = OpenAI(api_key=settings.openai_api_key)
-        self.target_language = settings.target_language
-        self.max_retries = settings.max_retries
-        self.retry_delay = settings.retry_delay
-        self.model = settings.openai_model
-        self.logger = get_logger(__name__)
-
-    def translate_recipe(self, recipe: dict[str, Any]) -> dict[str, Any]:
-        """Translate a complete recipe to the target language.
-
-        Args:
-            recipe: Recipe dictionary with content to translate
-
-        Returns:
-            Updated recipe dictionary with translated content
-
-        Raises:
-            Exception: If translation fails after all retries
-        """
-        translated_recipe = recipe.copy()
-
-        # Translate main fields
-        if recipe.get("name"):
-            translated_recipe["name"] = self._translate_text(recipe["name"])
-
-        if recipe.get("description"):
-            translated_recipe["description"] = self._translate_text(
-                recipe["description"]
-            )
-
-        # Translate instructions
-        if recipe.get("recipeInstructions"):
-            translated_recipe["recipeInstructions"] = self._translate_instructions(
-                recipe["recipeInstructions"]
-            )
-
-        # Translate ingredients
-        if recipe.get("recipeIngredient"):
-            translated_recipe["recipeIngredient"] = self._translate_ingredients(
-                recipe["recipeIngredient"]
-            )
-
-        # Translate notes if present
-        if recipe.get("notes"):
-            translated_recipe["notes"] = self._translate_notes(recipe["notes"])
-
-        return translated_recipe
-
-    def _translate_text(self, text: str) -> str:
-        """Translate a single text string.
-
-        Args:
-            text: Text to translate
-
-        Returns:
-            Translated text
-        """
-        if not text or not text.strip():
-            return text
-
-        translation_rules = self.TRANSLATION_RULES_BASE.format(
-            target_language=self.target_language
-        )
-
-        conversion_examples = """
+    CONVERSION_EXAMPLES = """
 VOLUME CONVERSION EXAMPLES (1 cup = 240 ml for ALL ingredients):
 - "1 cup flour" becomes "240 ml flour"
 - "1 cup sugar" becomes "240 ml sugar"
@@ -147,21 +76,97 @@ TEMPERATURE CONVERSION EXAMPLES:
 - "325°F" becomes "165°C"
 """
 
-        prompt = f"""
+    def __init__(self, settings: Settings):
+        """Initialize the translator.
+
+        Args:
+            settings: Application settings containing API configuration
+        """
+        self.client = AsyncOpenAI(api_key=settings.openai_api_key)
+        self.target_language = settings.target_language
+        self.max_retries = settings.max_retries
+        self.retry_delay = settings.retry_delay
+        self.model = settings.openai_model
+        self.logger = get_logger(__name__)
+
+    async def translate_recipe(self, recipe: dict[str, Any]) -> dict[str, Any]:
+        """Translate a complete recipe to the target language.
+
+        Args:
+            recipe: Recipe dictionary with content to translate
+
+        Returns:
+            Updated recipe dictionary with translated content
+
+        Raises:
+            Exception: If translation fails after all retries
+        """
+        translated_recipe = recipe.copy()
+
+        if recipe.get("name"):
+            translated_recipe["name"] = await self._translate_text(recipe["name"])
+
+        if recipe.get("description"):
+            translated_recipe["description"] = await self._translate_text(
+                recipe["description"]
+            )
+
+        if recipe.get("recipeInstructions"):
+            translated_recipe[
+                "recipeInstructions"
+            ] = await self._translate_instructions(recipe["recipeInstructions"])
+
+        if recipe.get("recipeIngredient"):
+            translated_recipe["recipeIngredient"] = await self._translate_ingredients(
+                recipe["recipeIngredient"]
+            )
+
+        if recipe.get("notes"):
+            translated_recipe["notes"] = await self._translate_notes(recipe["notes"])
+
+        return translated_recipe
+
+    def _build_translation_prompt(self, text: str) -> str:
+        """Build the translation prompt for a given text.
+
+        Args:
+            text: Text to include in the prompt
+
+        Returns:
+            Complete prompt string for translation
+        """
+        translation_rules = self.TRANSLATION_RULES_BASE.format(
+            target_language=self.target_language
+        )
+
+        return f"""
 You are a professional recipe translator and unit converter. Translate the following text to {self.target_language} AND convert imperial units to metric.
 
 {translation_rules}
 
 {self.UNIT_CONVERSION_RULES}
 
-{conversion_examples}
+{self.CONVERSION_EXAMPLES}
 
 Text to translate and convert: {text}
 """
 
-        return self._call_openai(prompt)
+    async def _translate_text(self, text: str) -> str:
+        """Translate a single text string.
 
-    def _translate_instructions(
+        Args:
+            text: Text to translate
+
+        Returns:
+            Translated text
+        """
+        if not text or not text.strip():
+            return text
+
+        prompt = self._build_translation_prompt(text)
+        return await self._call_openai(prompt)
+
+    async def _translate_instructions(
         self, instructions: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
         """Translate recipe instructions.
@@ -181,7 +186,7 @@ Text to translate and convert: {text}
             translated_instruction = instruction.copy()
 
             if instruction.get("text"):
-                translated_instruction["text"] = self._translate_text(
+                translated_instruction["text"] = await self._translate_text(
                     instruction["text"]
                 )
 
@@ -189,7 +194,7 @@ Text to translate and convert: {text}
 
         return translated_instructions
 
-    def _translate_ingredients(
+    async def _translate_ingredients(
         self, ingredients: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
         """Translate recipe ingredients.
@@ -203,7 +208,6 @@ Text to translate and convert: {text}
         if not ingredients:
             return ingredients
 
-        # Collect all ingredient texts for batch translation
         ingredient_texts = []
         for ingredient in ingredients:
             if ingredient.get("note"):
@@ -214,10 +218,8 @@ Text to translate and convert: {text}
         if not ingredient_texts:
             return ingredients
 
-        # Batch translate for efficiency
-        translated_texts = self._translate_ingredient_batch(ingredient_texts)
+        translated_texts = await self._translate_ingredient_batch(ingredient_texts)
 
-        # Apply translations back to ingredients
         translated_ingredients = []
         text_index = 0
 
@@ -236,7 +238,7 @@ Text to translate and convert: {text}
 
         return translated_ingredients
 
-    def _translate_ingredient_batch(self, texts: list[str]) -> list[str]:
+    async def _translate_ingredient_batch(self, texts: list[str]) -> list[str]:
         """Translate a batch of ingredient texts.
 
         Args:
@@ -248,7 +250,6 @@ Text to translate and convert: {text}
         if not texts:
             return texts
 
-        # Create numbered list for batch translation
         numbered_texts = "\n".join(f"{i + 1}. {text}" for i, text in enumerate(texts))
 
         ingredient_translation_rules = f"""
@@ -287,27 +288,26 @@ Ingredients to translate and convert:
 Return the translations with unit conversions in the same numbered format:
 """
 
-        response = self._call_openai(prompt)
+        response = await self._call_openai(prompt)
 
-        # Parse the numbered response back to list
         translated_lines = response.strip().split("\n")
         translated_texts = []
 
         for line in translated_lines:
-            # Remove numbering (e.g., "1. " from start)
             if ". " in line:
                 translated_text = line.split(". ", 1)[1]
                 translated_texts.append(translated_text)
             else:
                 translated_texts.append(line)
 
-        # Ensure we have the same number of translations as inputs
         while len(translated_texts) < len(texts):
             translated_texts.append(texts[len(translated_texts)])
 
         return translated_texts[: len(texts)]
 
-    def _translate_notes(self, notes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    async def _translate_notes(
+        self, notes: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         """Translate recipe notes.
 
         Args:
@@ -325,16 +325,16 @@ Return the translations with unit conversions in the same numbered format:
             translated_note = note.copy()
 
             if note.get("title"):
-                translated_note["title"] = self._translate_text(note["title"])
+                translated_note["title"] = await self._translate_text(note["title"])
 
             if note.get("text"):
-                translated_note["text"] = self._translate_text(note["text"])
+                translated_note["text"] = await self._translate_text(note["text"])
 
             translated_notes.append(translated_note)
 
         return translated_notes
 
-    def _call_openai(self, prompt: str, model: str | None = None) -> str:
+    async def _call_openai(self, prompt: str, model: str | None = None) -> str:
         """Make a call to OpenAI API with retry logic.
 
         Args:
@@ -351,7 +351,7 @@ Return the translations with unit conversions in the same numbered format:
 
         for attempt in range(self.max_retries):
             try:
-                response = self.client.chat.completions.create(
+                response = await self.client.chat.completions.create(
                     model=model_to_use,
                     messages=[
                         {
@@ -360,7 +360,7 @@ Return the translations with unit conversions in the same numbered format:
                         },
                         {"role": "user", "content": prompt},
                     ],
-                    max_completion_tokens=2000,  # Increased for longer recipes
+                    max_completion_tokens=2000,
                 )
 
                 content = response.choices[0].message.content
@@ -372,15 +372,19 @@ Return the translations with unit conversions in the same numbered format:
                 )
 
                 if attempt < self.max_retries - 1:
-                    time.sleep(self.retry_delay * (2**attempt))  # Exponential backoff
+                    await asyncio.sleep(
+                        self.retry_delay * (2**attempt)
+                    )  # Exponential backoff
                 else:
                     raise Exception(
                         f"Failed to translate after {self.max_retries} attempts: {e}"
                     ) from e
 
-        return ""  # Fallback return
+        return ""
 
-    def translate_text_with_model(self, text: str, model: str | None = None) -> str:
+    async def translate_text_with_model(
+        self, text: str, model: str | None = None
+    ) -> str:
         """Translate text with optional model override for testing.
 
         This method is designed for use by model comparison tools to test
@@ -396,37 +400,5 @@ Return the translations with unit conversions in the same numbered format:
         if not text or not text.strip():
             return text
 
-        translation_rules = self.TRANSLATION_RULES_BASE.format(
-            target_language=self.target_language
-        )
-
-        conversion_examples = """
-VOLUME CONVERSION EXAMPLES (1 cup = 240 ml for ALL ingredients):
-- "1 cup flour" becomes "240 ml flour"
-- "1 cup sugar" becomes "240 ml sugar"
-- "2 cups flour" becomes "480 ml flour"
-- "1/2 cup oil" becomes "120 ml oil"
-- "1 tablespoon oil" becomes "15 ml oil"
-
-MASS CONVERSION EXAMPLES:
-- "1 pound butter" becomes "455 g butter"
-- "8 ounces cream cheese" becomes "225 g cream cheese"
-
-TEMPERATURE CONVERSION EXAMPLES:
-- "350°F" becomes "175°C"
-- "325°F" becomes "165°C"
-"""
-
-        prompt = f"""
-You are a professional recipe translator and unit converter. Translate the following text to {self.target_language} AND convert imperial units to metric.
-
-{translation_rules}
-
-{self.UNIT_CONVERSION_RULES}
-
-{conversion_examples}
-
-Text to translate and convert: {text}
-"""
-
-        return self._call_openai(prompt, model)
+        prompt = self._build_translation_prompt(text)
+        return await self._call_openai(prompt, model)

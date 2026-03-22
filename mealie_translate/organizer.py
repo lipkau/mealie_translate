@@ -6,6 +6,7 @@ Categories describe WHEN/WHERE it fits in a meal (breakfast, dinner, dessert, et
 Both are generated in a single pass per recipe and persisted with one API call.
 """
 
+import asyncio
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -16,7 +17,6 @@ from .translator import RecipeTranslator
 
 # ── Taxonomy constants ─────────────────────────────────────────────────────
 
-# Controlled vocabulary for categories — must match docs/TAXONOMY.md exactly.
 ALLOWED_CATEGORIES: frozenset[str] = frozenset(
     {
         "breakfast",
@@ -34,7 +34,6 @@ ALLOWED_CATEGORIES: frozenset[str] = frozenset(
     }
 )
 
-# extras key used to mark a recipe as organised — same pattern as extras.translated.
 EXTRAS_ORGANISED_KEY: str = "organised"
 
 # ── LLM prompts ────────────────────────────────────────────────────────────
@@ -146,11 +145,7 @@ def _build_recipe_summary(recipe: dict[str, Any]) -> dict[str, str]:
 
 
 class OrganizerGenerator(ABC):
-    """Base class for LLM-powered Mealie organiser generators (tags, categories).
-
-    Subclasses declare their Mealie API path, recipe field name, and LLM prompt
-    logic. All Mealie CRUD and the apply-to-recipe workflow are inherited.
-    """
+    """Base class for LLM-powered Mealie organiser generators (tags, categories)."""
 
     def __init__(
         self,
@@ -164,8 +159,6 @@ class OrganizerGenerator(ABC):
         self.dry_run = dry_run
         self.logger = get_logger(__name__)
         self._cache: dict[str, dict[str, Any]] = {}
-
-    # ── Subclass contract ──────────────────────────────────────────────────
 
     @property
     @abstractmethod
@@ -183,22 +176,20 @@ class OrganizerGenerator(ABC):
         """Key in the recipe dict, e.g. 'tags' or 'recipeCategory'."""
 
     @abstractmethod
-    def _generate_names(self, recipe: dict[str, Any]) -> list[str]:
+    async def _generate_names(self, recipe: dict[str, Any]) -> list[str]:
         """Call the LLM and return a list of organiser names to add."""
-
-    # ── Mealie API helpers ─────────────────────────────────────────────────
 
     def _api_url(self) -> str:
         return f"{self.mealie_client.base_url}/api/{self.api_path}"
 
-    def load_existing(self) -> dict[str, dict[str, Any]]:
+    async def load_existing(self) -> dict[str, dict[str, Any]]:
         """Fetch all organisers of this type from Mealie (result is cached)."""
         if self._cache:
             return self._cache
 
         page, per_page = 1, 100
         while True:
-            response = self.mealie_client.session.get(
+            response = await self.mealie_client.client.get(
                 self._api_url(),
                 params={"page": page, "perPage": per_page},
                 timeout=30,
@@ -219,9 +210,9 @@ class OrganizerGenerator(ABC):
         )
         return self._cache
 
-    def get_or_create(self, name: str) -> dict[str, Any] | None:
+    async def get_or_create(self, name: str) -> dict[str, Any] | None:
         """Return an existing organiser object, creating it if it doesn't exist."""
-        existing = self.load_existing()
+        existing = await self.load_existing()
         key = name.lower().strip()
 
         if key in existing:
@@ -234,7 +225,7 @@ class OrganizerGenerator(ABC):
             return {"name": name}
 
         try:
-            response = self.mealie_client.session.post(
+            response = await self.mealie_client.client.post(
                 self._api_url(),
                 json={"name": name},
                 timeout=30,
@@ -249,10 +240,8 @@ class OrganizerGenerator(ABC):
                 f"POST to create {self.organizer_name} '{name}' failed ({e}); "
                 "refreshing cache in case it already exists"
             )
-            # Mealie returns 500 when the name is a duplicate — bust the cache
-            # and retry the lookup before giving up.
             self._cache.clear()
-            refreshed = self.load_existing()
+            refreshed = await self.load_existing()
             if key in refreshed:
                 self.logger.debug(
                     f"{self.organizer_name} '{name}' already existed; using it"
@@ -261,9 +250,7 @@ class OrganizerGenerator(ABC):
             self.logger.error(f"Failed to create {self.organizer_name} '{name}': {e}")
             return None
 
-    # ── Per-recipe workflow ────────────────────────────────────────────────
-
-    def apply_to_recipe(self, recipe: dict[str, Any]) -> bool:
+    async def apply_to_recipe(self, recipe: dict[str, Any]) -> bool:
         """Generate and merge new organisers into *recipe* in-place.
 
         The caller is responsible for persisting the updated recipe to Mealie.
@@ -272,7 +259,7 @@ class OrganizerGenerator(ABC):
             True on success (even when nothing new was added).
         """
         recipe_name = recipe.get("name", "unknown")
-        generated = self._generate_names(recipe)
+        generated = await self._generate_names(recipe)
 
         if not generated:
             self.logger.warning(
@@ -305,7 +292,7 @@ class OrganizerGenerator(ABC):
 
         new_objects: list[dict[str, Any]] = []
         for name in new_names:
-            obj = self.get_or_create(name)
+            obj = await self.get_or_create(name)
             if obj:
                 new_objects.append(obj)
 
@@ -339,11 +326,13 @@ class TagGenerator(OrganizerGenerator):
     def recipe_field(self) -> str:
         return "tags"
 
-    def _generate_names(self, recipe: dict[str, Any]) -> list[str]:
+    async def _generate_names(self, recipe: dict[str, Any]) -> list[str]:
         summary = _build_recipe_summary(recipe)
-        all_tags = sorted(self.load_existing().keys())
+        all_tags = sorted((await self.load_existing()).keys())
         summary["available_tags"] = ", ".join(all_tags) if all_tags else "None"
-        raw = self.translator._call_openai(TAG_GENERATION_PROMPT.format(**summary))
+        raw = await self.translator._call_openai(
+            TAG_GENERATION_PROMPT.format(**summary)
+        )
         if not raw:
             return []
         return [t.strip().lower() for t in raw.split(",") if t.strip()]
@@ -364,19 +353,17 @@ class CategoryGenerator(OrganizerGenerator):
     def recipe_field(self) -> str:
         return "recipeCategory"
 
-    def _generate_names(self, recipe: dict[str, Any]) -> list[str]:
+    async def _generate_names(self, recipe: dict[str, Any]) -> list[str]:
         summary = _build_recipe_summary(recipe)
-        raw = self.translator._call_openai(CATEGORY_GENERATION_PROMPT.format(**summary))
+        raw = await self.translator._call_openai(
+            CATEGORY_GENERATION_PROMPT.format(**summary)
+        )
         if not raw:
             return []
         candidates = [c.strip().lower() for c in raw.split(",") if c.strip()]
-        # Enforce the controlled vocabulary — discard anything outside it.
         valid = [c for c in candidates if c in ALLOWED_CATEGORIES]
         rejected = set(candidates) - set(valid)
         if rejected:
-            # Don't silently drop: surface suggestions for human review.
-            # If a rejected value keeps appearing across recipes it may be worth
-            # adding to ALLOWED_CATEGORIES and docs/TAXONOMY.md.
             self.logger.warning(
                 "LLM suggested categories outside the controlled vocabulary "
                 f"(discarded): {rejected}. "
@@ -389,14 +376,10 @@ class CategoryGenerator(OrganizerGenerator):
 
 
 class RecipeOrganizer:
-    """Orchestrates tag and category generation for Mealie recipes.
-
-    Fetches each recipe once, applies both generators in-place, then persists
-    with a single update call — minimising API round-trips.
-    """
+    """Orchestrates tag and category generation for Mealie recipes."""
 
     def __init__(self, settings: Settings | None = None, dry_run: bool = False) -> None:
-        """Initialise the organiser, creating Mealie client and translator from settings."""
+        """Initialise the organiser."""
         self.settings = settings or get_settings()
         self.mealie_client = MealieClient(self.settings)
         self.translator = RecipeTranslator(self.settings)
@@ -404,10 +387,20 @@ class RecipeOrganizer:
         self.dry_run = dry_run
         self._tag_gen = TagGenerator(self.mealie_client, self.translator, dry_run)
         self._cat_gen = CategoryGenerator(self.mealie_client, self.translator, dry_run)
+        self._semaphore = asyncio.Semaphore(self.settings.max_concurrent_requests)
+
+    async def __aenter__(self) -> "RecipeOrganizer":
+        """Enter async context manager."""
+        await self.mealie_client.__aenter__()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Exit async context manager."""
+        await self.mealie_client.__aexit__(exc_type, exc_val, exc_tb)
 
     @staticmethod
     def is_organised(recipe: dict[str, Any]) -> bool:
-        """Return True if this recipe has already been organised (tagged and categorised)."""
+        """Return True if this recipe has already been organised."""
         extras = recipe.get("extras") or {}
         return str(extras.get(EXTRAS_ORGANISED_KEY, "")).lower() in {"true", "1"}
 
@@ -418,7 +411,7 @@ class RecipeOrganizer:
             recipe["extras"] = {}
         recipe["extras"][EXTRAS_ORGANISED_KEY] = "true"
 
-    def process_recipe(
+    async def process_recipe(
         self,
         recipe_slug: str,
         generate_tags: bool = True,
@@ -431,14 +424,12 @@ class RecipeOrganizer:
             recipe_slug: The recipe slug/id to process.
             generate_tags: Whether to run the tag generator.
             generate_categories: Whether to run the category generator.
-            skip_organised: When True, return immediately if the recipe is already
-                marked as organised (extras.organised = 'true'). The CLI sets this
-                to False so ad-hoc runs always re-process.
+            skip_organised: When True, return immediately if already organised.
 
         Returns:
             True if processing was successful (or skipped as already done).
         """
-        recipe = self.mealie_client.get_recipe_details(recipe_slug)
+        recipe = await self.mealie_client.get_recipe_details(recipe_slug)
         if not recipe:
             self.logger.error(f"Recipe not found: {recipe_slug}")
             return False
@@ -453,23 +444,43 @@ class RecipeOrganizer:
 
         success = True
         if generate_tags:
-            success = self._tag_gen.apply_to_recipe(recipe) and success
+            success = await self._tag_gen.apply_to_recipe(recipe) and success
         if generate_categories:
-            success = self._cat_gen.apply_to_recipe(recipe) and success
+            success = await self._cat_gen.apply_to_recipe(recipe) and success
 
         if self.dry_run:
             return success
 
-        # Stamp the organised flag in the same payload — no extra API call needed.
         self._mark_as_organised(recipe)
 
-        if not self.mealie_client.update_recipe(recipe_slug, recipe):
+        if not await self.mealie_client.update_recipe(recipe_slug, recipe):
             self.logger.error(f"Failed to update recipe '{recipe_name}'")
             return False
 
         return success
 
-    def process_all_recipes(
+    async def _process_recipe_with_semaphore(
+        self,
+        recipe_slug: str,
+        generate_tags: bool,
+        generate_categories: bool,
+        skip_organised: bool,
+    ) -> dict[str, Any]:
+        """Process a single recipe with semaphore for rate limiting."""
+        async with self._semaphore:
+            try:
+                success = await self.process_recipe(
+                    recipe_slug,
+                    generate_tags=generate_tags,
+                    generate_categories=generate_categories,
+                    skip_organised=skip_organised,
+                )
+                return {"slug": recipe_slug, "success": success}
+            except Exception as e:
+                self.logger.error(f"Error organising '{recipe_slug}': {e}")
+                return {"slug": recipe_slug, "success": False, "error": str(e)}
+
+    async def process_all_recipes(
         self,
         generate_tags: bool = True,
         generate_categories: bool = True,
@@ -480,54 +491,48 @@ class RecipeOrganizer:
         Args:
             generate_tags: Whether to run the tag generator.
             generate_categories: Whether to run the category generator.
-            skip_organised: When True (default), recipes that already carry
-                extras.organised = 'true' are skipped and counted under 'skipped'.
-                Pass False (e.g. from the CLI) to force re-processing of all recipes.
+            skip_organised: When True (default), recipes already organised are skipped.
 
         Returns:
             Stats dict with keys: total, updated, skipped, failed.
         """
-        import time
-
         stats: dict[str, int] = {"total": 0, "updated": 0, "skipped": 0, "failed": 0}
 
-        all_recipes = self.mealie_client.get_all_recipes()
+        all_recipes = await self.mealie_client.get_all_recipes()
         stats["total"] = len(all_recipes)
 
         if not all_recipes:
             self.logger.warning("No recipes found on the server.")
             return stats
 
-        self.logger.info(f"Organising {stats['total']} recipes...")
+        self.logger.info(f"Organising {stats['total']} recipes concurrently...")
 
-        for i, recipe in enumerate(all_recipes, 1):
-            recipe_slug = recipe.get("slug") or recipe.get("id")
-            if not recipe_slug:
-                self.logger.warning("Recipe missing slug/id, skipping")
-                stats["skipped"] += 1
-                continue
+        slugs: list[str] = []
+        for r in all_recipes:
+            slug = r.get("slug") or r.get("id")
+            if slug:
+                slugs.append(slug)
 
-            self.logger.info(
-                f"[{i}/{stats['total']}] {recipe.get('name', recipe_slug)}"
-            )
-
-            try:
-                success = self.process_recipe(
-                    recipe_slug,
-                    generate_tags=generate_tags,
-                    generate_categories=generate_categories,
-                    skip_organised=skip_organised,
+        results = await asyncio.gather(
+            *[
+                self._process_recipe_with_semaphore(
+                    slug, generate_tags, generate_categories, skip_organised
                 )
-                if success:
-                    stats["updated"] += 1
-                else:
-                    stats["failed"] += 1
-            except Exception as e:
-                self.logger.error(f"Error organising '{recipe_slug}': {e}")
+                for slug in slugs
+            ],
+            return_exceptions=True,
+        )
+
+        for result in results:
+            if isinstance(result, BaseException):
+                self.logger.error(f"Unexpected error: {result}")
+                stats["failed"] += 1
+            elif isinstance(result, dict) and result.get("success"):
+                stats["updated"] += 1
+            else:
                 stats["failed"] += 1
 
-            # Polite delay between recipes to avoid hammering LLM/Mealie APIs
-            if i < stats["total"]:
-                time.sleep(1)
-
+        self.logger.info(
+            f"Organisation complete. Updated: {stats['updated']}, Failed: {stats['failed']}"
+        )
         return stats

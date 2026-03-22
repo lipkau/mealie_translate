@@ -10,12 +10,12 @@ This script calls production methods from RecipeTranslator and re-uses the
 organizer prompt constants directly, so results stay in sync when prompts change.
 """
 
+import asyncio
 import sys
 import time
 from pathlib import Path
 from typing import Any
 
-# Add the package to the Python path
 project_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(project_dir))
 
@@ -27,24 +27,17 @@ from mealie_translate.organizer import (
 )
 from mealie_translate.translator import RecipeTranslator
 
-# CONFIGURATION: Update this list when new models become available
-# Prices per 1M tokens (input / output) as of March 2026
 AVAILABLE_MODELS = [
-    # gpt-5.4 flagship series
-    "gpt-5.4-nano",  # $0.20 / $1.25
-    "gpt-5.4-mini",  # $0.75 / $4.50
-    "gpt-5.4",  # $2.50 / $15.00
-    # gpt-4.1 series
-    "gpt-4.1-nano",  # cheapest in series
-    "gpt-4.1-mini",  # mid-tier
-    "gpt-4.1",  # main model
-    # gpt-4o series (legacy reference)
-    "gpt-4o-mini",  # production default
-    "gpt-4o",  # previous flagship
+    "gpt-5.4-nano",
+    "gpt-5.4-mini",
+    "gpt-5.4",
+    "gpt-4.1-nano",
+    "gpt-4.1-mini",
+    "gpt-4.1",
+    "gpt-4o-mini",
+    "gpt-4o",
 ]
 
-# ── Unit conversion tests (harder edge cases) ────────────────────────────────
-# These go beyond trivial whole-number values to expose real capability gaps.
 UNIT_TEST_CASES = [
     {
         "name": "Fraction: 3/4 cup",
@@ -90,10 +83,6 @@ UNIT_TEST_CASES = [
     },
 ]
 
-# ── Tagging tests ─────────────────────────────────────────────────────────────
-# Verifies two rules from TAG_GENERATION_PROMPT:
-#   • expected_tags must appear (relevance)
-#   • forbidden words must NOT appear (category bleed — taxonomy rule #1)
 _CATEGORY_WORD_LIST = sorted(ALLOWED_CATEGORIES)
 
 TAG_TEST_CASES = [
@@ -108,7 +97,7 @@ TAG_TEST_CASES = [
             "existing_tags": "",
         },
         "expected_tags": ["italian", "pasta"],
-        "forbidden": _CATEGORY_WORD_LIST,  # Taxonomy rule: category words must not appear as tags
+        "forbidden": _CATEGORY_WORD_LIST,
     },
     {
         "name": "Pancakes — no 'breakfast' as a tag",
@@ -121,16 +110,10 @@ TAG_TEST_CASES = [
             "existing_tags": "",
         },
         "expected_tags": ["sweet"],
-        # Breakfast foods commonly bleed category words into tags — this catches it
         "forbidden": ["breakfast", "brunch", "lunch", "dinner"],
     },
 ]
 
-# ── Category tests ─────────────────────────────────────────────────────────────
-# Verifies two rules from CATEGORY_GENERATION_PROMPT:
-#   • all returned values must be in ALLOWED_CATEGORIES (vocabulary compliance)
-#   • expected_categories must appear (correct assignment)
-#   • must_not_include words must not appear (wrong assignment)
 CATEGORY_TEST_CASES = [
     {
         "name": "Chocolate Lava Cake → dessert",
@@ -154,15 +137,12 @@ CATEGORY_TEST_CASES = [
             "existing_categories": "",
         },
         "expected_categories": ["condiment"],
-        "must_not_include": [
-            "main",
-            "dinner",
-        ],  # 'main' is explicitly banned per the prompt
+        "must_not_include": ["main", "dinner"],
     },
 ]
 
 
-def _run_unit_tests(
+async def _run_unit_tests(
     translator: RecipeTranslator, model_name: str
 ) -> list[dict[str, Any]]:
     """Run unit conversion tests and return per-test results."""
@@ -173,7 +153,7 @@ def _run_unit_tests(
         print(f"   Expected: {tc['expected_output']}")
         start = time.time()
         try:
-            output = translator.translate_text_with_model(tc["input"], model_name)
+            output = await translator.translate_text_with_model(tc["input"], model_name)
             elapsed = time.time() - start
             found = [e for e in tc["key_elements"] if e.lower() in output.lower()]
             missing = [e for e in tc["key_elements"] if e.lower() not in output.lower()]
@@ -218,7 +198,7 @@ def _run_unit_tests(
     return results
 
 
-def _run_tag_tests(
+async def _run_tag_tests(
     translator: RecipeTranslator, model_name: str
 ) -> list[dict[str, Any]]:
     """Run tagging tests and return per-test results."""
@@ -228,7 +208,7 @@ def _run_tag_tests(
         prompt = TAG_GENERATION_PROMPT.format(**tc["recipe"])
         start = time.time()
         try:
-            output = translator._call_openai(prompt, model_name)
+            output = await translator._call_openai(prompt, model_name)
             elapsed = time.time() - start
             tags_raw = [t.strip().lower() for t in output.split(",") if t.strip()]
             missing_expected = [
@@ -238,9 +218,9 @@ def _run_tag_tests(
             if not missing_expected and not violations:
                 status = "✅ PASSED"
             elif not violations:
-                status = "🟡 PARTIAL"  # has some expected tags but none forbidden
+                status = "🟡 PARTIAL"
             else:
-                status = "❌ FAILED"  # category word used as tag: taxonomy violation
+                status = "❌ FAILED"
             print(f"   Output:      {output}")
             print(f"   Status:      {status}  ({elapsed:.2f}s)")
             if missing_expected:
@@ -278,7 +258,7 @@ def _run_tag_tests(
     return results
 
 
-def _run_category_tests(
+async def _run_category_tests(
     translator: RecipeTranslator, model_name: str
 ) -> list[dict[str, Any]]:
     """Run categorisation tests and return per-test results."""
@@ -288,7 +268,7 @@ def _run_category_tests(
         prompt = CATEGORY_GENERATION_PROMPT.format(**tc["recipe"])
         start = time.time()
         try:
-            output = translator._call_openai(prompt, model_name)
+            output = await translator._call_openai(prompt, model_name)
             elapsed = time.time() - start
             cats_raw = [c.strip().lower() for c in output.split(",") if c.strip()]
             vocab_violations = [c for c in cats_raw if c not in ALLOWED_CATEGORIES]
@@ -299,7 +279,7 @@ def _run_category_tests(
             if not vocab_violations and not missing_expected and not wrong_assigned:
                 status = "✅ PASSED"
             elif not vocab_violations and not wrong_assigned:
-                status = "🟡 PARTIAL"  # correct vocab but missing a category
+                status = "🟡 PARTIAL"
             else:
                 status = "❌ FAILED"
             print(f"   Output:       {output}")
@@ -349,7 +329,7 @@ def _count_statuses(tests: list[dict]) -> tuple[int, int, int]:
     return passed, partial, len(tests) - passed - partial
 
 
-def test_single_model(model_name: str, settings) -> dict[str, Any]:
+async def test_single_model(model_name: str, settings) -> dict[str, Any]:
     """Test a single model across unit conversion, tagging, and categorisation."""
     print(f"\n{'=' * 60}")
     print(f"🔬 Testing {model_name}")
@@ -358,13 +338,13 @@ def test_single_model(model_name: str, settings) -> dict[str, Any]:
     translator = RecipeTranslator(settings)
 
     print("\n📐 Unit Conversion Tests")
-    unit_results = _run_unit_tests(translator, model_name)
+    unit_results = await _run_unit_tests(translator, model_name)
 
     print("\n🏷️  Tagging Tests")
-    tag_results = _run_tag_tests(translator, model_name)
+    tag_results = await _run_tag_tests(translator, model_name)
 
     print("\n📂 Categorisation Tests")
-    cat_results = _run_category_tests(translator, model_name)
+    cat_results = await _run_category_tests(translator, model_name)
 
     all_tests = unit_results + tag_results + cat_results
     total_time = sum(t["time"] for t in all_tests)
@@ -414,7 +394,6 @@ def print_comparison_summary(all_results: list[dict[str, Any]]):
     print("📊 COMPREHENSIVE MODEL COMPARISON SUMMARY")
     print("=" * 90)
 
-    # Sort by overall pass rate, then by speed
     sorted_results = sorted(
         all_results,
         key=lambda x: (
@@ -493,7 +472,7 @@ def print_comparison_summary(all_results: list[dict[str, Any]]):
             print(f"   {icon} {t['name']}: {t['output'][:60]}{extra}")
 
 
-def main():
+async def async_main():
     """Run the detailed model comparison."""
     print("🔬 DETAILED GPT MODEL COMPARISON")
     print("Unit Conversion · Tagging · Categorisation")
@@ -509,7 +488,7 @@ def main():
 
         for model in AVAILABLE_MODELS:
             try:
-                result = test_single_model(model, settings)
+                result = await test_single_model(model, settings)
                 all_results.append(result)
             except Exception as e:
                 print(f"❌ Failed to test {model}: {e}")
@@ -526,6 +505,11 @@ def main():
     except Exception as e:
         print(f"❌ Comparison failed: {e}")
         return False
+
+
+def main():
+    """Main function to run the detailed model comparison."""
+    return asyncio.run(async_main())
 
 
 if __name__ == "__main__":

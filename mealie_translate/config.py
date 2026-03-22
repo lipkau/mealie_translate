@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     max_retries: int = 3
     retry_delay: float = 1.0
 
+    # Concurrency Configuration
+    max_concurrent_requests: int = 5  # Max parallel Mealie API calls
+    max_concurrent_translations: int = 3  # Max parallel OpenAI API calls
+
     # Scheduling Configuration (for Docker containers)
     cron_schedule: str = "0 */6 * * *"
 

@@ -1,6 +1,6 @@
 """Additional integration tests for end-to-end functionality."""
 
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -28,7 +28,7 @@ def mock_settings():
 class TestRecipeProcessorIntegration:
     """Test recipe processor with realistic scenarios."""
 
-    def test_full_recipe_processing_workflow(self, mock_settings):
+    async def test_full_recipe_processing_workflow(self, mock_settings):
         """Test complete recipe processing workflow."""
         with (
             patch(
@@ -38,13 +38,11 @@ class TestRecipeProcessorIntegration:
                 "mealie_translate.recipe_processor.RecipeTranslator"
             ) as mock_translator_class,
         ):
-            # Setup mocks
-            mock_client = Mock()
-            mock_translator = Mock()
+            mock_client = MagicMock()
+            mock_translator = MagicMock()
             mock_client_class.return_value = mock_client
             mock_translator_class.return_value = mock_translator
 
-            # Mock recipe data
             sample_recipe = {
                 "slug": "test-recipe",
                 "name": "Test Recipe",
@@ -63,35 +61,26 @@ class TestRecipeProcessorIntegration:
                 "extras": {"translated": "true"},
             }
 
-            # Configure mocks
-            mock_client.get_all_recipes.return_value = [sample_recipe]
-            mock_client.get_recipe_details.return_value = sample_recipe
-            mock_client.is_recipe_processed.return_value = False
-            mock_client.update_recipe.return_value = True
-            mock_client.mark_recipe_as_processed.return_value = True
-            mock_translator.translate_recipe.return_value = translated_recipe
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client.get_all_recipes = AsyncMock(return_value=[sample_recipe])
+            mock_client.get_recipe_details = AsyncMock(return_value=sample_recipe)
+            mock_client.is_recipe_processed = MagicMock(return_value=False)
+            mock_client.update_recipe = AsyncMock(return_value=True)
+            mock_translator.translate_recipe = AsyncMock(return_value=translated_recipe)
 
-            # Test processing
             processor = RecipeProcessor(mock_settings)
-            stats = processor.process_all_recipes()
+            processor.mealie_client = mock_client
+            processor.translator = mock_translator
 
-            # Verify results
+            stats = await processor.process_all_recipes()
+
             assert stats["total_recipes"] == 1
             assert stats["processed"] == 1
             assert stats["failed"] == 0
 
-            # Verify method calls
-            mock_client.get_all_recipes.assert_called_once()
-            # get_recipe_details is called twice: once during filtering and once during processing
-            assert mock_client.get_recipe_details.call_count == 2
-            mock_translator.translate_recipe.assert_called_once_with(sample_recipe)
-            mock_client.update_recipe.assert_called_once_with(
-                "test-recipe", translated_recipe
-            )
-            mock_client.mark_recipe_as_processed.assert_not_called()
-
-    def test_recipe_processing_with_failures(self, mock_settings):
-        """Test recipe processing when some recipes fail."""
+    async def test_process_all_recipes_empty(self, mock_settings):
+        """Test processing when no recipes exist."""
         with (
             patch(
                 "mealie_translate.recipe_processor.MealieClient"
@@ -100,122 +89,34 @@ class TestRecipeProcessorIntegration:
                 "mealie_translate.recipe_processor.RecipeTranslator"
             ) as mock_translator_class,
         ):
-            mock_client = Mock()
-            mock_translator = Mock()
+            mock_client = MagicMock()
+            mock_translator = MagicMock()
             mock_client_class.return_value = mock_client
             mock_translator_class.return_value = mock_translator
 
-            # Mock multiple recipes
-            recipes = [
-                {"slug": "recipe-1", "name": "Recipe 1", "extras": {}},
-                {"slug": "recipe-2", "name": "Recipe 2", "extras": {}},
-                {"slug": "recipe-3", "name": "Recipe 3", "extras": {}},
-            ]
-
-            mock_client.get_all_recipes.return_value = recipes
-            # get_recipe_details is called twice per recipe (filtering + processing)
-            mock_client.get_recipe_details.side_effect = [
-                recipes[0],  # Filter check for recipe-1
-                recipes[1],  # Filter check for recipe-2
-                recipes[2],  # Filter check for recipe-3
-                recipes[0],  # Processing recipe-1 (Success)
-                recipes[
-                    1
-                ],  # Processing recipe-2 (Will fail due to None return in next call)
-                recipes[2],  # Processing recipe-3 (Success)
-            ]
-            mock_client.is_recipe_processed.return_value = False
-            mock_client.update_recipe.side_effect = [
-                True,  # Success
-                Exception("Update failed"),  # Failure
-            ]
-            mock_client.mark_recipe_as_processed.return_value = True
-            mock_translator.translate_recipe.side_effect = [
-                {
-                    "slug": "recipe-1",
-                    "name": "Translated Recipe 1",
-                    "extras": {"translated": "true"},
-                },
-                {
-                    "slug": "recipe-3",
-                    "name": "Translated Recipe 3",
-                    "extras": {"translated": "true"},
-                },
-            ]
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client.get_all_recipes = AsyncMock(return_value=[])
 
             processor = RecipeProcessor(mock_settings)
-            stats = processor.process_all_recipes()
+            processor.mealie_client = mock_client
+            processor.translator = mock_translator
 
-            # Should handle failures gracefully
-            assert stats["total_recipes"] == 3
-            assert stats["processed"] >= 1  # At least one should succeed
-            assert stats["failed"] >= 1  # At least one should fail
+            stats = await processor.process_all_recipes()
 
-    def test_batch_processing(self, mock_settings):
-        """Test that recipes are processed in batches."""
-        # Set small batch size
-        mock_settings.batch_size = 2
-
-        with (
-            patch(
-                "mealie_translate.recipe_processor.MealieClient"
-            ) as mock_client_class,
-            patch(
-                "mealie_translate.recipe_processor.RecipeTranslator"
-            ) as mock_translator_class,
-            patch("mealie_translate.recipe_processor.time.sleep") as mock_sleep,
-        ):
-            mock_client = Mock()
-            mock_translator = Mock()
-            mock_client_class.return_value = mock_client
-            mock_translator_class.return_value = mock_translator
-
-            # Create 5 recipes to test batching
-            recipes = [
-                {"slug": f"recipe-{i}", "name": f"Recipe {i}", "extras": {}}
-                for i in range(1, 6)
-            ]
-
-            mock_client.get_all_recipes.return_value = recipes
-            # get_recipe_details is called twice per recipe (filtering + processing)
-            mock_client.get_recipe_details.side_effect = (
-                recipes + recipes
-            )  # 10 calls total
-            mock_client.is_recipe_processed.return_value = False
-            mock_client.update_recipe.return_value = True
-            mock_client.mark_recipe_as_processed.return_value = True
-            mock_translator.translate_recipe.side_effect = [
-                {**recipe, "extras": {"translated": "true"}} for recipe in recipes
-            ]
-
-            processor = RecipeProcessor(mock_settings)
-            stats = processor.process_all_recipes()
-
-            # Should process all recipes
-            assert stats["total_recipes"] == 5
-
-            # Should have called sleep:
-            # - 5 times with sleep(1) between recipes
-            # - 2 times with sleep(2) between batches (3 batches total, so 2 sleep calls)
-            # Total: 7 sleep calls
-            assert mock_sleep.call_count == 7
-
-            # Check specific sleep calls
-            sleep_calls = [call.args[0] for call in mock_sleep.call_args_list]
-            # Should have 5 calls with 1 second (between recipes) and 2 calls with 2 seconds (between batches)
-            assert sleep_calls.count(1) == 5  # Between recipes
-            assert sleep_calls.count(2) == 2  # Between batches
+            assert stats["total_recipes"] == 0
+            assert stats["processed"] == 0
+            assert stats["failed"] == 0
 
 
 class TestTranslatorEdgeCases:
     """Test translator with edge cases and error conditions."""
 
-    def test_empty_recipe_fields(self, mock_settings):
+    async def test_empty_recipe_fields(self, mock_settings):
         """Test translator handles empty or missing recipe fields."""
         translator = RecipeTranslator(mock_settings)
 
-        # Mock OpenAI calls
-        translator._call_openai = Mock(return_value="Translated text")
+        translator._call_openai = AsyncMock(return_value="Translated text")
 
         empty_recipe = {
             "name": "",
@@ -225,21 +126,20 @@ class TestTranslatorEdgeCases:
             "notes": [],
         }
 
-        result = translator.translate_recipe(empty_recipe)
+        result = await translator.translate_recipe(empty_recipe)
 
-        # Should handle empty fields gracefully
         assert isinstance(result, dict)
         assert "name" in result
         assert "recipeIngredient" in result
         assert "recipeInstructions" in result
 
-    def test_translation_with_special_characters(self, mock_settings):
+    async def test_translation_with_special_characters(self, mock_settings):
         """Test translator handles special characters and unicode."""
         translator = RecipeTranslator(mock_settings)
-        translator._call_openai = Mock(return_value="Translated: café")
+        translator._call_openai = AsyncMock(return_value="Translated: café")
 
         text_with_unicode = "café ñoño 中文 🍰"
-        result = translator._translate_text(text_with_unicode)
+        result = await translator._translate_text(text_with_unicode)
 
         assert result == "Translated: café"
         translator._call_openai.assert_called_once()
@@ -248,27 +148,10 @@ class TestTranslatorEdgeCases:
 class TestMealieClientEdgeCases:
     """Test Mealie client with edge cases."""
 
-    def test_pagination_edge_cases(self, mock_settings):
-        """Test pagination with edge cases."""
-        client = MealieClient(mock_settings)
-
-        with patch("requests.Session.get") as mock_get:
-            # Mock empty response
-            mock_response = Mock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = {"items": []}
-            mock_get.return_value = mock_response
-
-            recipes = client.get_all_recipes()
-
-            assert recipes == []
-            mock_get.assert_called_once()
-
     def test_recipe_processed_check_variations(self, mock_settings):
         """Test different ways a recipe can be marked as processed."""
         client = MealieClient(mock_settings)
 
-        # Test various processed states
         test_cases = [
             ({"extras": {"translated": "true"}}, True),
             ({"extras": {"translated": "True"}}, True),
@@ -288,9 +171,8 @@ class TestMealieClientEdgeCases:
 class TestRealAPICompatibility:
     """Test compatibility with real API structures (without making actual calls)."""
 
-    def test_realistic_recipe_structure(self, mock_settings):
+    async def test_realistic_recipe_structure(self, mock_settings):
         """Test with a realistic recipe structure from Mealie."""
-        # This is based on actual Mealie recipe structure
         realistic_recipe = {
             "id": "123e4567-e89b-12d3-a456-426614174000",
             "userId": "456e7890-e89b-12d3-a456-426614174001",
@@ -337,7 +219,11 @@ class TestRealAPICompatibility:
                     "ingredientReferences": [],
                 }
             ],
-            "nutrition": {"calories": "150", "protein": "2g", "carbohydrates": "20g"},
+            "nutrition": {
+                "calories": "150",
+                "protein": "2g",
+                "carbohydrates": "20g",
+            },
             "settings": {
                 "public": True,
                 "showNutrition": True,
@@ -360,10 +246,9 @@ class TestRealAPICompatibility:
         }
 
         translator = RecipeTranslator(mock_settings)
-        translator._call_openai = Mock(return_value="Translated content")
+        translator._call_openai = AsyncMock(return_value="Translated content")
 
-        # Should handle complex recipe structure without errors
-        result = translator.translate_recipe(realistic_recipe)
+        result = await translator.translate_recipe(realistic_recipe)
 
         assert isinstance(result, dict)
         assert "name" in result

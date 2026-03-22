@@ -7,10 +7,10 @@ automatically as part of its periodic cron job.
 """
 
 import argparse
+import asyncio
 import sys
 from pathlib import Path
 
-# Add the package to the Python path
 project_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(project_dir))
 
@@ -19,8 +19,8 @@ from mealie_translate.logger import get_logger
 from mealie_translate.organizer import RecipeOrganizer
 
 
-def main() -> int:
-    """CLI entry point."""
+async def async_main() -> int:
+    """Async CLI entry point."""
     logger = get_logger(__name__)
 
     parser = argparse.ArgumentParser(
@@ -73,30 +73,36 @@ Examples:
         generate_tags = not args.categories_only
         generate_categories = not args.tags_only
 
-        organizer = RecipeOrganizer(settings=settings, dry_run=args.dry_run)
+        async with RecipeOrganizer(
+            settings=settings, dry_run=args.dry_run
+        ) as organizer:
+            if args.recipe:
+                success = await organizer.process_recipe(
+                    args.recipe,
+                    generate_tags=generate_tags,
+                    generate_categories=generate_categories,
+                )
+                return 0 if success else 1
 
-        if args.recipe:
-            success = organizer.process_recipe(
-                args.recipe,
+            stats = await organizer.process_all_recipes(
                 generate_tags=generate_tags,
                 generate_categories=generate_categories,
+                skip_organised=False,
             )
-            return 0 if success else 1
-
-        stats = organizer.process_all_recipes(
-            generate_tags=generate_tags,
-            generate_categories=generate_categories,
-            skip_organised=False,  # CLI always re-processes; app uses the default (True)
-        )
-        logger.info(
-            f"Done! total={stats['total']} updated={stats['updated']} "
-            f"skipped={stats['skipped']} failed={stats['failed']}"
-        )
-        return 0 if stats["failed"] == 0 else 1
+            logger.info(
+                f"Done! total={stats['total']} updated={stats['updated']} "
+                f"skipped={stats['skipped']} failed={stats['failed']}"
+            )
+            return 0 if stats["failed"] == 0 else 1
 
     except Exception as e:
         logger.error(f"Application error: {e}")
         return 1
+
+
+def main() -> int:
+    """CLI entry point."""
+    return asyncio.run(async_main())
 
 
 if __name__ == "__main__":

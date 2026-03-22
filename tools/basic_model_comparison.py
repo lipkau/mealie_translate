@@ -11,12 +11,12 @@ re-uses the organizer prompt constants, ensuring results stay in sync when
 prompts change.
 """
 
+import asyncio
 import sys
 import time
 from pathlib import Path
 from typing import Any
 
-# Add the package to the Python path
 project_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(project_dir))
 
@@ -37,22 +37,17 @@ class ModelComparison:
         if not self.settings.openai_api_key:
             raise ValueError("OpenAI API key is required for model comparison")
 
-        # Models to compare - ordered from cheapest to most capable
         self.models = [
-            # gpt-5.4 flagship series (as of March 2026)
             "gpt-5.4-nano",
             "gpt-5.4-mini",
             "gpt-5.4",
-            # gpt-4.1 series
             "gpt-4.1-nano",
             "gpt-4.1-mini",
             "gpt-4.1",
-            # gpt-4o series (legacy reference)
             "gpt-4o-mini",
             "gpt-4o",
         ]
 
-        # ── Unit conversion test cases (edge cases) ────────────────────────────
         self.unit_cases = [
             {
                 "name": "Fraction: 3/4 cup",
@@ -93,8 +88,6 @@ class ModelComparison:
 
         _category_word_list = sorted(ALLOWED_CATEGORIES)
 
-        # ── Tagging test cases ────────────────────────────────────────────────────
-        # expected_tags: must appear; forbidden: must NOT appear (taxonomy rule)
         self.tag_cases = [
             {
                 "name": "Carbonara — cuisine + no category bleed",
@@ -124,8 +117,6 @@ class ModelComparison:
             },
         ]
 
-        # ── Category test cases ─────────────────────────────────────────────────
-        # expected_categories: must appear; must_not_include: banned assignments
         self.category_cases = [
             {
                 "name": "Chocolate Lava Cake → dessert",
@@ -153,7 +144,7 @@ class ModelComparison:
             },
         ]
 
-    def test_model(self, model_name: str) -> dict[str, Any]:
+    async def test_model(self, model_name: str) -> dict[str, Any]:
         """Test a specific model across unit conversion, tagging, and categorisation."""
         print(f"\n🧪 Testing model: {model_name}")
         print("-" * 50)
@@ -175,13 +166,14 @@ class ModelComparison:
         }
         total_time = 0.0
 
-        # ─ Unit conversion ────────────────────────────────────────────────────
         print("  📐 Unit Conversion:")
         for i, tc in enumerate(self.unit_cases, 1):
             print(f"    {i}. {tc['name']}: ", end="")
             start = time.time()
             try:
-                output = translator.translate_text_with_model(tc["input"], model_name)
+                output = await translator.translate_text_with_model(
+                    tc["input"], model_name
+                )
                 elapsed = time.time() - start
                 total_time += elapsed
                 missing = [
@@ -221,14 +213,13 @@ class ModelComparison:
                     }
                 )
 
-        # ─ Tagging ───────────────────────────────────────────────────────────
         print("  🏷️  Tagging:")
         for i, tc in enumerate(self.tag_cases, 1):
             print(f"    {i}. {tc['name']}: ", end="")
             prompt = TAG_GENERATION_PROMPT.format(**tc["recipe"])
             start = time.time()
             try:
-                output = translator._call_openai(prompt, model_name)
+                output = await translator._call_openai(prompt, model_name)
                 elapsed = time.time() - start
                 total_time += elapsed
                 tags_raw = [t.strip().lower() for t in output.split(",") if t.strip()]
@@ -272,14 +263,13 @@ class ModelComparison:
                     }
                 )
 
-        # ─ Categorisation ───────────────────────────────────────────────────
         print("  📂 Categorisation:")
         for i, tc in enumerate(self.category_cases, 1):
             print(f"    {i}. {tc['name']}: ", end="")
             prompt = CATEGORY_GENERATION_PROMPT.format(**tc["recipe"])
             start = time.time()
             try:
-                output = translator._call_openai(prompt, model_name)
+                output = await translator._call_openai(prompt, model_name)
                 elapsed = time.time() - start
                 total_time += elapsed
                 cats_raw = [c.strip().lower() for c in output.split(",") if c.strip()]
@@ -329,7 +319,7 @@ class ModelComparison:
         results["average_time"] = total_time / total_cases
         return results
 
-    def run_comparison(self) -> dict[str, Any]:
+    async def run_comparison(self) -> dict[str, Any]:
         """Run comparison across all models."""
         print("🔬 GPT Model Comparison — Unit Conversion · Tagging · Categorisation")
         print("=" * 70)
@@ -338,7 +328,7 @@ class ModelComparison:
 
         for model in self.models:
             try:
-                results = self.test_model(model)
+                results = await self.test_model(model)
                 all_results[model] = results
             except Exception as e:
                 print(f"\n❌ Failed to test model {model}: {e}")
@@ -364,7 +354,6 @@ class ModelComparison:
         print("📊 COMPARISON SUMMARY")
         print("=" * 70)
 
-        # Sort models by success rate
         sorted_models = sorted(
             all_results.items(),
             key=lambda x: x[1].get("passed", 0) / max(x[1].get("total_tests", 1), 1),
@@ -416,14 +405,13 @@ class ModelComparison:
                 print("   No models completed successfully")
 
 
-def main():
-    """Main function to run the model comparison."""
+async def async_main():
+    """Async main function to run the model comparison."""
     try:
         comparison = ModelComparison()
-        results = comparison.run_comparison()
+        results = await comparison.run_comparison()
         comparison.print_summary(results)
 
-        # Optionally save detailed results
         print(
             "\n💾 To see detailed results for any model, check the test_results in the returned data"
         )
@@ -433,6 +421,11 @@ def main():
     except Exception as e:
         print(f"❌ Model comparison failed: {e}")
         return False
+
+
+def main():
+    """Main function to run the model comparison."""
+    return asyncio.run(async_main())
 
 
 if __name__ == "__main__":

@@ -1,17 +1,16 @@
 """Mealie API client for managing recipes."""
 
+import asyncio
 from typing import Any
 
-import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
+import httpx
 
 from .config import Settings
 from .logger import get_logger
 
 
 class MealieClient:
-    """Client for interacting with Mealie API."""
+    """Async client for interacting with Mealie API."""
 
     def __init__(self, settings: Settings):
         """Initialize the Mealie client.
@@ -21,36 +20,95 @@ class MealieClient:
         """
         self.base_url = settings.mealie_base_url
         self.api_token = settings.mealie_api_token
-        self.session = self._create_session()
+        self.max_retries = settings.max_retries
+        self.retry_delay = settings.retry_delay
+        self._client: httpx.AsyncClient | None = None
         self.logger = get_logger(__name__)
 
-    def _create_session(self) -> requests.Session:
-        """Create a requests session with retry strategy."""
-        session = requests.Session()
-
-        # Configure retry strategy
-        retry_strategy = Retry(
-            total=3,
-            backoff_factor=1,
-            status_forcelist=[429, 502, 503, 504],
-        )
-
-        adapter = HTTPAdapter(max_retries=retry_strategy)
-        session.mount("http://", adapter)
-        session.mount("https://", adapter)
-
-        # Set default headers
-        session.headers.update(
-            {
+    async def __aenter__(self) -> "MealieClient":
+        """Enter async context manager."""
+        self._client = httpx.AsyncClient(
+            headers={
                 "Authorization": f"Bearer {self.api_token}",
                 "Content-Type": "application/json",
                 "Accept": "application/json",
-            }
+            },
+            timeout=httpx.Timeout(30.0, read=60.0),
         )
+        return self
 
-        return session
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Exit async context manager."""
+        if self._client:
+            await self._client.aclose()
+            self._client = None
 
-    def get_all_recipes(self, exclude_tag: str | None = None) -> list[dict[str, Any]]:
+    @property
+    def client(self) -> httpx.AsyncClient:
+        """Get the HTTP client, raising if not initialized."""
+        if self._client is None:
+            raise RuntimeError(
+                "MealieClient must be used as async context manager: "
+                "async with MealieClient(settings) as client: ..."
+            )
+        return self._client
+
+    async def _request_with_retry(
+        self,
+        method: str,
+        url: str,
+        **kwargs,
+    ) -> httpx.Response:
+        """Make an HTTP request with retry logic.
+
+        Args:
+            method: HTTP method (GET, POST, PUT, etc.)
+            url: Request URL
+            **kwargs: Additional arguments to pass to httpx
+
+        Returns:
+            HTTP response
+
+        Raises:
+            httpx.HTTPStatusError: If request fails after all retries
+        """
+        last_exception: Exception | None = None
+
+        for attempt in range(self.max_retries):
+            try:
+                response = await self.client.request(method, url, **kwargs)
+                response.raise_for_status()
+                return response
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code in [429, 502, 503, 504]:
+                    last_exception = e
+                    if attempt < self.max_retries - 1:
+                        delay = self.retry_delay * (2**attempt)
+                        self.logger.warning(
+                            f"Request failed with {e.response.status_code}, "
+                            f"retrying in {delay}s (attempt {attempt + 1}/{self.max_retries})"
+                        )
+                        await asyncio.sleep(delay)
+                    continue
+                raise
+            except httpx.RequestError as e:
+                last_exception = e
+                if attempt < self.max_retries - 1:
+                    delay = self.retry_delay * (2**attempt)
+                    self.logger.warning(
+                        f"Request error: {e}, "
+                        f"retrying in {delay}s (attempt {attempt + 1}/{self.max_retries})"
+                    )
+                    await asyncio.sleep(delay)
+                continue
+
+        if last_exception:
+            raise last_exception
+        raise RuntimeError("Unexpected error in retry loop")
+
+    async def get_all_recipes(
+        self, exclude_tag: str | None = None
+    ) -> list[dict[str, Any]]:
         """Fetch all recipes from Mealie server.
 
         Args:
@@ -60,9 +118,9 @@ class MealieClient:
             List of recipe dictionaries
 
         Raises:
-            requests.RequestException: If API request fails
+            httpx.HTTPStatusError: If API request fails
         """
-        recipes = []
+        recipes: list[dict[str, Any]] = []
         page = 1
         per_page = 50
 
@@ -80,41 +138,29 @@ class MealieClient:
             }
 
             try:
-                response = self.session.get(url, params=params, timeout=30)
-                response.raise_for_status()
-
+                response = await self._request_with_retry("GET", url, params=params)
                 data: dict[str, Any] = response.json()
                 batch_recipes = data.get("items", [])
 
                 if not batch_recipes:
                     break
 
-                # Filter out recipes with the exclude tag if specified
-                # Note: We can't filter by extras.translated here because
-                # the list endpoint may not include the extras field.
-                # We'll need to check this during individual processing.
-                if exclude_tag:
-                    # For now, we'll get all recipes and filter during processing
-                    # This is a limitation of the Mealie API list endpoint
-                    pass
-
                 recipes.extend(batch_recipes)
 
-                # Check if we've reached the end
                 if len(batch_recipes) < per_page:
                     break
 
                 page += 1
 
-            except requests.RequestException as e:
+            except httpx.HTTPStatusError as e:
                 self.logger.error(f"Error fetching recipes page {page}: {e}")
                 raise
 
         self.logger.info(f"Found {len(recipes)} recipes total")
         return recipes
 
-    def get_recipe_details(self, recipe_slug: str) -> dict[str, Any] | None:
-        """Get detailed information for a specific recipe using GET /api/recipes/{slug}.
+    async def get_recipe_details(self, recipe_slug: str) -> dict[str, Any] | None:
+        """Get detailed information for a specific recipe.
 
         Args:
             recipe_slug: The recipe slug/identifier
@@ -123,35 +169,32 @@ class MealieClient:
             Recipe details dictionary or None if not found
 
         Raises:
-            requests.RequestException: If API request fails
+            httpx.HTTPStatusError: If API request fails (except 404)
         """
         url = f"{self.base_url}/api/recipes/{recipe_slug}"
         self.logger.debug(f"Fetching recipe details: {url}")
 
         try:
-            response = self.session.get(url, timeout=30)
-            response.raise_for_status()
+            response = await self._request_with_retry("GET", url)
             recipe_data: dict[str, Any] = response.json()
             self.logger.debug(
                 f"Successfully fetched recipe: {recipe_data.get('name', 'Unknown')}"
             )
             return recipe_data
 
-        except requests.HTTPError as e:
-            if hasattr(e, "response") and e.response.status_code == 404:
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
                 self.logger.warning(f"Recipe not found: {recipe_slug}")
                 return None
-            else:
-                self.logger.error(
-                    f"HTTP error fetching recipe details for {recipe_slug}: {e}"
-                )
-                raise
-        except requests.RequestException as e:
-            self.logger.error(f"Error fetching recipe details for {recipe_slug}: {e}")
+            self.logger.error(
+                f"HTTP error fetching recipe details for {recipe_slug}: {e}"
+            )
             raise
 
-    def update_recipe(self, recipe_slug: str, recipe_data: dict[str, Any]) -> bool:
-        """Update a recipe with new data using PUT /api/recipes/{slug}.
+    async def update_recipe(
+        self, recipe_slug: str, recipe_data: dict[str, Any]
+    ) -> bool:
+        """Update a recipe with new data.
 
         Args:
             recipe_slug: The recipe slug/identifier
@@ -161,28 +204,23 @@ class MealieClient:
             True if update successful, False otherwise
 
         Raises:
-            requests.RequestException: If API request fails
+            httpx.HTTPStatusError: If API request fails
         """
         url = f"{self.base_url}/api/recipes/{recipe_slug}"
         self.logger.debug(f"Updating recipe: {url}")
 
         try:
-            # Send the complete recipe object as-is
-            # Mealie expects all fields to be present during updates
             self.logger.debug(
                 f"Sending update for recipe: {recipe_data.get('name', 'Unknown')}"
             )
 
-            response = self.session.put(
-                url, json=recipe_data, timeout=60
-            )  # Increased timeout for larger updates
-            response.raise_for_status()
+            await self._request_with_retry("PUT", url, json=recipe_data)
             self.logger.info(f"Successfully updated recipe: {recipe_slug}")
             return True
 
-        except requests.RequestException as e:
+        except httpx.HTTPStatusError as e:
             self.logger.error(f"Error updating recipe {recipe_slug}: {e}")
-            if hasattr(e, "response") and e.response is not None:
+            if e.response is not None:
                 self.logger.error(f"Response status: {e.response.status_code}")
                 try:
                     error_detail = e.response.json()
@@ -191,7 +229,7 @@ class MealieClient:
                     self.logger.error(f"Response text: {e.response.text[:500]}")
             raise
 
-    def mark_recipe_as_processed(self, recipe_slug: str) -> bool:
+    async def mark_recipe_as_processed(self, recipe_slug: str) -> bool:
         """Mark a recipe as processed by setting extras.translated = "true".
 
         Args:
@@ -201,22 +239,18 @@ class MealieClient:
             True if marked successfully, False otherwise
         """
         try:
-            # First get the current recipe
-            recipe = self.get_recipe_details(recipe_slug)
+            recipe = await self.get_recipe_details(recipe_slug)
             if not recipe:
                 return False
 
-            # Check if already marked as processed
             if self.is_recipe_processed(recipe):
-                return True  # Already processed
+                return True
 
-            # Set the processed flag in extras
             if "extras" not in recipe:
                 recipe["extras"] = {}
             recipe["extras"]["translated"] = "true"
 
-            # Update the recipe
-            return self.update_recipe(recipe_slug, recipe)
+            return await self.update_recipe(recipe_slug, recipe)
 
         except Exception as e:
             self.logger.error(f"Error marking recipe {recipe_slug} as processed: {e}")
@@ -233,5 +267,4 @@ class MealieClient:
         """
         extras = recipe.get("extras", {})
         translated_value = extras.get("translated", "")
-        # Support multiple ways of marking as processed
         return translated_value.lower() in ["true", "1"]

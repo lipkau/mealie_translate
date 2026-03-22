@@ -2,6 +2,7 @@
 """Main script for the Mealie Recipe Translator."""
 
 import argparse
+import asyncio
 
 from .config import get_settings
 from .logger import get_logger, setup_logging
@@ -9,8 +10,8 @@ from .organizer import RecipeOrganizer
 from .recipe_processor import RecipeProcessor
 
 
-def main():
-    """Main application entry point."""
+async def async_main() -> int:
+    """Async main application entry point."""
     setup_logging()
     logger = get_logger(__name__)
 
@@ -41,11 +42,9 @@ Examples:
 
     args = parser.parse_args()
 
-    # Load configuration
     try:
         settings = get_settings()
 
-        # Validate required settings
         if not settings.mealie_base_url:
             logger.error("Error: MEALIE_BASE_URL not configured")
             return 1
@@ -60,39 +59,41 @@ Examples:
 
         logger.info("Configuration loaded successfully")
 
-        processor = RecipeProcessor(settings)
-        organizer = RecipeOrganizer(settings=settings)
-
         if args.recipe:
-            # Translate the specific recipe
-            logger.info(f"Processing specific recipe: {args.recipe}")
-            result = processor.process_single_recipe(args.recipe)
-            if not result:
-                logger.error(f"Failed to process recipe: {args.recipe}")
-                return 1
-            logger.info(f"Successfully translated recipe: {args.recipe}")
+            async with RecipeProcessor(settings) as processor:
+                logger.info(f"Processing specific recipe: {args.recipe}")
+                result = await processor.process_single_recipe(args.recipe)
+                if not result:
+                    logger.error(f"Failed to process recipe: {args.recipe}")
+                    return 1
+                logger.info(f"Successfully translated recipe: {args.recipe}")
 
-            # Organise the same recipe unless skipped
             if not args.skip_organise:
-                logger.info(f"Organising recipe: {args.recipe}")
-                organizer.process_recipe(args.recipe)
+                async with RecipeOrganizer(settings=settings) as organizer:
+                    logger.info(f"Organising recipe: {args.recipe}")
+                    await organizer.process_recipe(args.recipe)
         else:
-            # Translate all unprocessed recipes
-            logger.info("Starting to translate all unprocessed recipes")
-            results = processor.process_all_recipes()
-            logger.info(f"Translation complete. Results: {results}")
+            async with RecipeProcessor(settings) as processor:
+                logger.info("Starting to translate all unprocessed recipes")
+                results = await processor.process_all_recipes()
+                logger.info(f"Translation complete. Results: {results}")
 
-            # Organise all recipes (including already-translated ones)
             if not args.skip_organise:
-                logger.info("Starting to organise all recipes (tags + categories)")
-                org_results = organizer.process_all_recipes()
-                logger.info(f"Organisation complete. Results: {org_results}")
+                async with RecipeOrganizer(settings=settings) as organizer:
+                    logger.info("Starting to organise all recipes (tags + categories)")
+                    org_results = await organizer.process_all_recipes()
+                    logger.info(f"Organisation complete. Results: {org_results}")
 
     except Exception as e:
         logger.error(f"Application error: {str(e)}")
         return 1
 
     return 0
+
+
+def main() -> int:
+    """Main entry point that runs the async main function."""
+    return asyncio.run(async_main())
 
 
 if __name__ == "__main__":

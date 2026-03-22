@@ -71,18 +71,20 @@ docker compose up -d
 
 Set these environment variables:
 
-| Variable           | Description                              | Example                         |
-| ------------------ | ---------------------------------------- | ------------------------------- |
-| `MEALIE_BASE_URL`  | Your Mealie server URL                   | `https://mealie.yourdomain.com` |
-| `MEALIE_API_TOKEN` | Mealie API token                         | `your-api-token-here`           |
-| `OPENAI_API_KEY`   | OpenAI API key                           | `sk-...`                        |
-| `OPENAI_MODEL`     | OpenAI Model                             | `gpt-4o-mini`                   |
-| `TARGET_LANGUAGE`  | Language to translate to                 | `English`                       |
-| `PROCESSED_TAG`    | Tag for processed recipes                | `translated`                    |
-| `BATCH_SIZE`       | Number of recipes to process in parallel | `10`                            |
-| `CRON_SCHEDULE`    | Schedule for automatic runs              | `0 */6 * * *` (every 6 hours)   |
-| `MAX_RETRIES`      | Retry attempts for failed API calls      | `3`                             |
-| `RETRY_DELAY`      | Base delay between retries in seconds    | `1`                             |
+| Variable                       | Description                              | Example                         |
+| ------------------------------ | ---------------------------------------- | ------------------------------- |
+| `MEALIE_BASE_URL`              | Your Mealie server URL                   | `https://mealie.yourdomain.com` |
+| `MEALIE_API_TOKEN`             | Mealie API token                         | `your-api-token-here`           |
+| `OPENAI_API_KEY`               | OpenAI API key                           | `sk-...`                        |
+| `OPENAI_MODEL`                 | OpenAI Model                             | `gpt-4o-mini`                   |
+| `TARGET_LANGUAGE`              | Language to translate to                 | `English`                       |
+| `PROCESSED_TAG`                | Tag for processed recipes                | `translated`                    |
+| `BATCH_SIZE`                   | Number of recipes to process in parallel | `10`                            |
+| `CRON_SCHEDULE`                | Schedule for automatic runs              | `0 */6 * * *` (every 6 hours)   |
+| `MAX_RETRIES`                  | Retry attempts for failed API calls      | `3`                             |
+| `RETRY_DELAY`                  | Base delay between retries in seconds    | `1`                             |
+| `MAX_CONCURRENT_REQUESTS`      | Max parallel Mealie API calls            | `5`                             |
+| `MAX_CONCURRENT_TRANSLATIONS`  | Max parallel OpenAI API calls            | `3`                             |
 
 **Getting API tokens:**
 

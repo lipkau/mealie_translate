@@ -1,6 +1,6 @@
 """Additional tests for recipe processor."""
 
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -25,10 +25,23 @@ def mock_settings():
 def processor(mock_settings):
     """Create a RecipeProcessor instance for testing."""
     with (
-        patch("mealie_translate.recipe_processor.MealieClient") as _mock_client,
-        patch("mealie_translate.recipe_processor.RecipeTranslator") as _mock_translator,
+        patch("mealie_translate.recipe_processor.MealieClient") as mock_client_class,
+        patch(
+            "mealie_translate.recipe_processor.RecipeTranslator"
+        ) as mock_translator_class,
     ):
-        return RecipeProcessor(mock_settings)
+        mock_client = MagicMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+        mock_client_class.return_value = mock_client
+
+        mock_translator = MagicMock()
+        mock_translator_class.return_value = mock_translator
+
+        proc = RecipeProcessor(mock_settings)
+        proc.mealie_client = mock_client
+        proc.translator = mock_translator
+        return proc
 
 
 def test_processor_initialization(mock_settings):
@@ -44,28 +57,11 @@ def test_processor_initialization(mock_settings):
         mock_translator.assert_called_once_with(mock_settings)
 
 
-def test_filter_unprocessed_recipes(processor):
-    """Test _filter_unprocessed_recipes method (deprecated - now returns all recipes)."""
-    recipes = [
-        {"slug": "recipe1", "tags": []},
-        {"slug": "recipe2", "tags": [{"name": "translated"}]},
-        {"slug": "recipe3", "tags": [{"name": "breakfast"}]},
-        {"slug": "recipe4", "tags": [{"name": "healthy"}, {"name": "translated"}]},
-    ]
-
-    unprocessed = processor._filter_unprocessed_recipes(recipes)
-
-    # This method is now deprecated and just returns all recipes
-    # Filtering is done at a higher level using the extras field
-    assert len(unprocessed) == 4
-    assert unprocessed == recipes
-
-
-def test_process_single_recipe_not_found(processor):
+async def test_process_single_recipe_not_found(processor):
     """Test process_single_recipe with recipe not found."""
-    processor.mealie_client.get_recipe_details.return_value = None
+    processor.mealie_client.get_recipe_details = AsyncMock(return_value=None)
 
-    result = processor.process_single_recipe("nonexistent-recipe")
+    result = await processor.process_single_recipe("nonexistent-recipe")
 
     assert result is False
     processor.mealie_client.get_recipe_details.assert_called_once_with(
@@ -73,38 +69,65 @@ def test_process_single_recipe_not_found(processor):
     )
 
 
-def test_process_single_recipe_already_processed(processor):
+async def test_process_single_recipe_already_processed(processor):
     """Test process_single_recipe with already processed recipe."""
-    processor.mealie_client.get_recipe_details.return_value = {
-        "slug": "test-recipe",
-        "name": "Test Recipe",
-        "tags": [{"name": "translated"}],
-    }
-    processor.mealie_client.has_tag.return_value = True
+    processor.mealie_client.get_recipe_details = AsyncMock(
+        return_value={
+            "slug": "test-recipe",
+            "name": "Test Recipe",
+            "extras": {"translated": "true"},
+        }
+    )
+    processor.mealie_client.is_recipe_processed = MagicMock(return_value=True)
 
-    result = processor.process_single_recipe("test-recipe")
+    result = await processor.process_single_recipe("test-recipe")
 
-    # Returns True because the recipe is considered "successfully processed" (no work needed)
     assert result is True
 
 
-@patch("mealie_translate.recipe_processor.time.sleep")
-def test_process_recipe_batch_empty(mock_sleep, processor):
-    """Test _process_recipe_batch with empty recipe list."""
-    result = processor._process_recipe_batch([])
+async def test_process_recipe_batch_empty(processor):
+    """Test _process_recipe_batch_concurrent with empty recipe list."""
+    result = await processor._process_recipe_batch_concurrent([])
 
     assert result["processed"] == 0
     assert result["failed"] == 0
-    assert mock_sleep.call_count == 0
+    assert result["skipped"] == 0
 
 
-def test_process_all_recipes_empty(processor):
+async def test_process_all_recipes_empty(processor):
     """Test process_all_recipes with no recipes."""
-    processor.mealie_client.get_all_recipes.return_value = []
+    processor.mealie_client.get_all_recipes = AsyncMock(return_value=[])
 
-    result = processor.process_all_recipes()
+    result = await processor.process_all_recipes()
 
     assert result["total_recipes"] == 0
     assert result["processed"] == 0
     assert result["skipped"] == 0
     assert result["failed"] == 0
+
+
+async def test_process_single_recipe_success(processor):
+    """Test successful single recipe processing."""
+    recipe_data = {
+        "slug": "test-recipe",
+        "name": "Test Recipe",
+        "description": "A test recipe",
+        "extras": {},
+    }
+    translated_recipe = {
+        "slug": "test-recipe",
+        "name": "Translated Recipe",
+        "description": "A translated recipe",
+        "extras": {},
+    }
+
+    processor.mealie_client.get_recipe_details = AsyncMock(return_value=recipe_data)
+    processor.mealie_client.is_recipe_processed = MagicMock(return_value=False)
+    processor.mealie_client.update_recipe = AsyncMock(return_value=True)
+    processor.translator.translate_recipe = AsyncMock(return_value=translated_recipe)
+
+    result = await processor.process_single_recipe("test-recipe")
+
+    assert result is True
+    processor.translator.translate_recipe.assert_called_once()
+    processor.mealie_client.update_recipe.assert_called_once()

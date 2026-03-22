@@ -1,18 +1,12 @@
 """Tests for configuration management."""
 
-import sys
-from pathlib import Path
-
-# Add the src directory to the Python path
-project_dir = Path(__file__).parent.parent
-sys.path.insert(0, str(project_dir / "src"))
+import os
 
 from mealie_translate.config import Settings, get_settings
 
 
 def test_module_imports():
     """Test that all modules can be imported successfully."""
-    # If we get here, all imports succeeded
     assert True
 
 
@@ -24,6 +18,8 @@ def test_settings_creation():
     assert settings.batch_size == 10
     assert settings.max_retries == 3
     assert settings.retry_delay == 1.0
+    assert settings.max_concurrent_requests == 5
+    assert settings.max_concurrent_translations == 3
 
 
 def test_settings_validation():
@@ -34,10 +30,8 @@ def test_settings_validation():
         openai_api_key="test_key",
     )
 
-    # URL should have trailing slash removed
     assert settings.mealie_base_url == "https://example.com"
 
-    # Target language should be title case - test through constructor
     settings_with_lowercase = Settings(
         mealie_base_url="https://example.com",
         mealie_api_token="test_token",
@@ -55,9 +49,6 @@ def test_get_settings():
 
 def test_settings_environment_loading():
     """Test that settings can load from environment variables."""
-    import os
-
-    # Set test environment variables
     test_env = {
         "MEALIE_BASE_URL": "https://test.example.com",
         "MEALIE_API_TOKEN": "test_token",
@@ -66,7 +57,6 @@ def test_settings_environment_loading():
         "PROCESSED_TAG": "test_tag",
     }
 
-    # Save original values
     original_env = {}
     for key in test_env:
         original_env[key] = os.environ.get(key)
@@ -77,10 +67,9 @@ def test_settings_environment_loading():
         assert settings.mealie_base_url == "https://test.example.com"
         assert settings.mealie_api_token == "test_token"
         assert settings.openai_api_key == "test_key"
-        assert settings.target_language == "Spanish"  # Should be title case
+        assert settings.target_language == "Spanish"
         assert settings.processed_tag == "test_tag"
     finally:
-        # Restore original environment
         for key, value in original_env.items():
             if value is None:
                 os.environ.pop(key, None)
