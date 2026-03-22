@@ -8,7 +8,7 @@
     "pyright": "1.1.408"
   },
   "scripts": {
-    "lint:markdown": "markdownlint-cli2 \"**/*.md\"",
-    "lint:markdown:fix": "markdownlint-cli2 --fix \"**/*.md\""
+    "lint:markdown": "markdownlint-cli2 \"**/*.md\" \"!.github/**\" \"!.cursor/**\"",
+    "lint:markdown:fix": "markdownlint-cli2 --fix \"**/*.md\" \"!.github/**\" \"!.cursor/**\""
   }
 }

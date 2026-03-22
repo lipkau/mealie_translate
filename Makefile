@@ -252,13 +252,10 @@ lint-format:
 lint-markdown:
 	@echo "Checking markdown formatting..."
 	@if command -v npx >/dev/null 2>&1 && [ -f package.json ]; then \
-		echo "Using npx markdownlint-cli2 (from package.json)..."; \
-		npx markdownlint-cli2 "**/*.md"; \
-	elif command -v markdownlint-cli2 >/dev/null 2>&1; then \
-		echo "Using global markdownlint-cli2..."; \
-		markdownlint-cli2 "**/*.md"; \
+		echo "Using npm lint:markdown (from package.json)..."; \
+		npm run lint:markdown; \
 	else \
-		echo "⚠️  markdownlint-cli2 not found. Install with: npm install or npm install -g markdownlint-cli2"; \
+		echo "⚠️  markdownlint-cli2 not found. Install with: npm install"; \
 		exit 1; \
 	fi
 

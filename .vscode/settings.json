@@ -12,7 +12,7 @@
   },
   "ruff.lineLength": 88,
   "ruff.enable": true,
-  "python.languageServer": "Pylance",
+  "python.languageServer": "None",
   "files.exclude": {
     "**/__pycache__": true,
     "**/.pytest_cache": true,
