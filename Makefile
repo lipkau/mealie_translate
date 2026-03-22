@@ -1,4 +1,49 @@
-.PHONY: help setup setup-full setup-env install install-dev test test-unit test-integration test-coverage lint lint-format lint-markdown lint-all lint-no-markdown format check pre-commit pre-commit-force pre-commit-uninstall clean clean-all run compare-models compare-models-basic verify-prompts generate-tags docker-build docker-run docker-dev docker-test docker-clean security-scan security-bandit security-pip-audit
+# =============================================================================
+# Mealie Recipe Translator - Makefile
+# =============================================================================
+# Primary development interface. Run `make help` for available commands.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# .PHONY declarations (organized by category)
+# -----------------------------------------------------------------------------
+
+# Setup targets
+.PHONY: help setup setup-full setup-env install install-dev check-python
+
+# Test targets
+.PHONY: test test-unit test-integration test-coverage
+
+# Lint & format targets
+.PHONY: lint lint-format lint-markdown lint-all lint-no-markdown format check
+
+# CI targets (use system Python, no HTML reports)
+.PHONY: ci-lint ci-test-unit ci-test-coverage ci-test-integration
+
+# Pre-commit targets
+.PHONY: pre-commit pre-commit-force pre-commit-uninstall pre-commit-lint pre-commit-format pre-commit-test
+
+# Cleanup targets
+.PHONY: clean clean-all clean-force
+
+# Application targets
+.PHONY: run compare-models compare-models-basic verify-prompts generate-tags
+
+# Docker targets
+.PHONY: docker-build docker-run docker-dev docker-logs docker-test docker-clean
+
+# Security targets
+.PHONY: security-scan security-bandit security-pip-audit
+
+# Internal prerequisite targets (not for direct use)
+.PHONY: .ensure-python .ensure-pytest .ensure-ruff .ensure-precommit
+
+# -----------------------------------------------------------------------------
+# Configuration
+# -----------------------------------------------------------------------------
+
+# Source directories for linting/formatting
+SOURCES := mealie_translate/ tests/ tools/ main.py
 
 # Auto-detect virtual environment or use default
 VENV_PATH := $(shell if [ -d ".venv" ]; then echo ".venv"; elif [ -d "venv" ]; then echo "venv"; elif [ -d "env" ]; then echo "env"; elif [ -n "$(VIRTUAL_ENV)" ]; then echo "$(VIRTUAL_ENV)"; else echo ".venv"; fi)
@@ -27,18 +72,44 @@ else
     endif
 endif
 
-# Default target
+# -----------------------------------------------------------------------------
+# Prerequisite checks (DRY pattern for dependency validation)
+# -----------------------------------------------------------------------------
+
+.ensure-python:
+	@$(PYTHON) --version >/dev/null 2>&1 || { echo "⚠️  Python not found at $(PYTHON). Run 'make setup' first."; exit 1; }
+
+.ensure-pytest: .ensure-python
+	@$(PYTHON) -c "import pytest" 2>/dev/null || { echo "⚠️  pytest not found. Run 'make setup' first."; exit 1; }
+
+.ensure-ruff: .ensure-python
+	@$(PYTHON) -c "import ruff" 2>/dev/null || { echo "⚠️  ruff not found. Run 'make setup' first."; exit 1; }
+
+.ensure-precommit:
+	@$(VENV_PATH)/bin/pre-commit --version >/dev/null 2>&1 || { echo "⚠️  pre-commit not found. Run 'make setup' first."; exit 1; }
+
+# -----------------------------------------------------------------------------
+# Help
+# -----------------------------------------------------------------------------
+
 help:
 	@echo "Available commands:"
+	@echo ""
+	@echo "Setup:"
 	@echo "  setup                Create virtual environment and install dependencies"
 	@echo "  setup-full           Complete setup including pre-commit hooks (recommended for contributors)"
 	@echo "  setup-env            Copy .env.example to .env (run after setup, or included in setup)"
 	@echo "  install              Install production dependencies"
 	@echo "  install-dev          Install development dependencies"
+	@echo "  check-python         Check Python version compatibility"
+	@echo ""
+	@echo "Testing:"
 	@echo "  test                 Run all tests (generates JUnit XML and HTML reports)"
 	@echo "  test-unit            Run unit tests only (generates JUnit XML and HTML reports)"
 	@echo "  test-integration     Run integration tests (generates JUnit XML and HTML reports)"
 	@echo "  test-coverage        Run tests with coverage report (generates JUnit XML, HTML, and coverage reports)"
+	@echo ""
+	@echo "Code Quality:"
 	@echo "  lint                 Run code linting (ruff, pyright)"
 	@echo "  lint-format          Check code formatting (ruff)"
 	@echo "  lint-markdown        Check markdown formatting (markdownlint-cli2)"
@@ -46,19 +117,33 @@ help:
 	@echo "  lint-no-markdown     Run linting without markdown (for CI)"
 	@echo "  format               Format code with ruff"
 	@echo "  check                Complete dev workflow: format + lint-all + test (⭐ shorthand)"
+	@echo ""
+	@echo "CI Targets (use system Python, minimal output):"
+	@echo "  ci-lint              Run linting for CI (no venv, includes pyright)"
+	@echo "  ci-test-unit         Run unit tests for CI (JUnit XML only)"
+	@echo "  ci-test-coverage     Run tests with coverage for CI (XML reports only)"
+	@echo "  ci-test-integration  Run integration tests for CI (JUnit XML only)"
+	@echo ""
+	@echo "Security:"
 	@echo "  security-scan        Run all security scans (bandit + pip-audit)"
 	@echo "  security-bandit      Run bandit security scanner (creates bandit-report.json)"
 	@echo "  security-pip-audit   Run pip-audit dependency vulnerability scanner (creates pip-audit-report.json)"
+	@echo ""
+	@echo "Pre-commit Hooks:"
 	@echo "  pre-commit           Install git hooks (interactive, with detailed warnings)"
 	@echo "  pre-commit-force     Install git hooks without prompting (for automation)"
 	@echo "  pre-commit-uninstall Remove git hooks from repository"
 	@echo "  pre-commit-lint      Lightweight lint for pre-commit (no output)"
 	@echo "  pre-commit-format    Lightweight format for pre-commit (no output)"
 	@echo "  pre-commit-test      Lightweight test for pre-commit (quiet mode)"
+	@echo ""
+	@echo "Cleanup:"
 	@echo "  clean                Clean up cache files, test reports, and build artifacts"
-	@echo "  clean-all            Deep clean including virtual environment"
+	@echo "  clean-all            Deep clean including virtual environment (interactive)"
+	@echo "  clean-force          Deep clean without prompting (for automation)"
+	@echo ""
+	@echo "Application:"
 	@echo "  run                  Run the main application"
-	@echo "  check-python         Check Python version compatibility"
 	@echo "  compare-models       Run detailed model comparison"
 	@echo "  compare-models-basic Run basic model comparison"
 	@echo "  verify-prompts       Verify model comparison uses production prompts"
@@ -72,25 +157,29 @@ help:
 	@echo "  docker-test          Run tests in Docker container"
 	@echo "  docker-clean         Clean Docker images and containers"
 	@echo ""
-	@echo "Virtual environment detected: $(VENV_PATH)"
+	@echo "Environment Info:"
+	@echo "  Virtual environment: $(VENV_PATH)"
 ifneq ($(PYENV_AVAILABLE),)
-	@echo "Pyenv detected: Available"
+	@echo "  Pyenv: Available"
 ifneq ($(PYTHON_VERSION_FILE),)
-	@echo "Python version file: $(shell cat .python-version)"
+	@echo "  Python version file: $(shell cat .python-version)"
 endif
 else
-	@echo "Pyenv detected: Not available"
+	@echo "  Pyenv: Not available"
 endif
-	@echo "Python for venv creation: $(PYTHON_FOR_VENV)"
+	@echo "  Python for venv: $(PYTHON_FOR_VENV)"
 	@echo ""
 	@echo "Quick Start:"
-	@echo "  1. make setup-full  # Complete setup for contributors: venv, dependencies, env config, npm deps & pre-commit hooks"
+	@echo "  1. make setup-full  # Complete setup for contributors"
 	@echo "     OR"
-	@echo "     make setup       # Basic setup: venv, dependencies, env config (no npm deps or pre-commit hooks)"
+	@echo "     make setup       # Basic setup (no npm deps or pre-commit hooks)"
 	@echo "  2. Edit .env file with your API keys"
 	@echo "  3. make run         # Start the application"
 
-# Python version checking
+# -----------------------------------------------------------------------------
+# Setup
+# -----------------------------------------------------------------------------
+
 check-python:
 	@echo "Checking Python version compatibility..."
 	@python_version=$$($(PYTHON_FOR_VENV) -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"); \
@@ -109,7 +198,6 @@ check-python:
 		exit 1; \
 	fi
 
-# Setup - Create venv and install dev dependencies (basic)
 setup: check-python
 	@echo "Setting up development environment..."
 	@if [ ! -d "$(VENV_PATH)" ]; then \
@@ -127,7 +215,6 @@ setup: check-python
 	@echo ""
 	@echo "💡 Tip: If you plan to contribute to this project, run 'make pre-commit' to install git hooks"
 
-# Setup - Complete setup including pre-commit hooks (for contributors)
 setup-full: setup
 	@echo ""
 	@echo "🔧 Installing Node.js dependencies for markdown linting..."
@@ -164,7 +251,6 @@ setup-full: setup
 	fi
 	@echo "✅ Full setup complete!"
 
-# Environment setup
 setup-env:
 	@if [ ! -f ".env.example" ]; then \
 		echo "⚠️  .env.example not found in current directory"; \
@@ -179,58 +265,48 @@ setup-env:
 		echo "📝 Please edit .env with your API keys and configuration"; \
 	fi
 
-# Install dependencies
-install:
-	@if ! $(PYTHON) --version >/dev/null 2>&1; then \
-		echo "⚠️  Python not found at $(PYTHON). Run 'make setup' first."; \
-		exit 1; \
-	fi
+install: .ensure-python
 	$(PIP) install -e .
 
-install-dev:
-	@if ! $(PYTHON) --version >/dev/null 2>&1; then \
-		echo "⚠️  Python not found at $(PYTHON). Run 'make setup' first."; \
-		exit 1; \
-	fi
+install-dev: .ensure-python
 	$(PIP) install -e .[dev]
 
-# Testing
-test:
-	@if ! $(PYTHON) -c "import pytest" 2>/dev/null; then \
-		echo "⚠️  pytest not found. Run 'make setup' first to install dependencies."; \
-		exit 1; \
-	fi
+# -----------------------------------------------------------------------------
+# Testing (local development - includes HTML reports)
+# -----------------------------------------------------------------------------
+
+test: .ensure-pytest
 	$(PYTHON) -m pytest tests/ -v --junit-xml=pytest-results.xml --html=pytest-report.html --self-contained-html
 
-test-unit:
-	@if ! $(PYTHON) -c "import pytest" 2>/dev/null; then \
-		echo "⚠️  pytest not found. Run 'make setup' first to install dependencies."; \
-		exit 1; \
-	fi
+test-unit: .ensure-pytest
 	$(PYTHON) -m pytest tests/ -v -m "not integration" --junit-xml=pytest-results-unit.xml --html=pytest-report-unit.html --self-contained-html
 
-test-integration:
-	@if ! $(PYTHON) -c "import pytest" 2>/dev/null; then \
-		echo "⚠️  pytest not found. Run 'make setup' first to install dependencies."; \
-		exit 1; \
-	fi
+test-integration: .ensure-pytest
 	$(PYTHON) -m pytest tests/ -v -m "integration" --junit-xml=pytest-results-integration.xml --html=pytest-report-integration.html --self-contained-html
 
-test-coverage:
-	@if ! $(PYTHON) -c "import pytest, pytest_cov" 2>/dev/null; then \
-		echo "⚠️  pytest or pytest-cov not found. Run 'make setup' first to install dependencies."; \
-		exit 1; \
-	fi
+test-coverage: .ensure-pytest
 	$(PYTHON) -m pytest tests/ --cov=mealie_translate --cov-report=html --cov-report=term --cov-report=xml --junit-xml=pytest-results-coverage.xml --html=pytest-report-coverage.html --self-contained-html
 
-# Code quality
-lint:
+# -----------------------------------------------------------------------------
+# CI Testing (system Python, no HTML reports, minimal overhead)
+# -----------------------------------------------------------------------------
+
+ci-test-unit:
+	python -m pytest tests/ -v -m "not integration" --junit-xml=pytest-results.xml
+
+ci-test-coverage:
+	python -m pytest tests/ -v -m "not integration" --cov=mealie_translate --cov-report=xml --cov-report=term --junit-xml=pytest-results.xml
+
+ci-test-integration:
+	python -m pytest tests/ -v -m "integration" --junit-xml=pytest-results-integration.xml
+
+# -----------------------------------------------------------------------------
+# Linting & Formatting
+# -----------------------------------------------------------------------------
+
+lint: .ensure-ruff
 	@echo "Running code linting..."
-	@if ! $(PYTHON) -c "import ruff" 2>/dev/null; then \
-		echo "⚠️  ruff not found. Run 'make setup' first to install dependencies."; \
-		exit 1; \
-	fi
-	$(PYTHON) -m ruff check mealie_translate/ tests/ tools/ main.py
+	$(PYTHON) -m ruff check $(SOURCES)
 	@if ! command -v npx >/dev/null 2>&1; then \
 		echo "⚠️  npx not found. Install Node.js or run 'npm install'."; \
 		exit 1; \
@@ -241,13 +317,9 @@ lint:
 	fi
 	npx pyright
 
-lint-format:
+lint-format: .ensure-ruff
 	@echo "Checking code formatting..."
-	@if ! $(PYTHON) -c "import ruff" 2>/dev/null; then \
-		echo "⚠️  ruff not found. Run 'make setup' first to install dependencies."; \
-		exit 1; \
-	fi
-	$(PYTHON) -m ruff format --check mealie_translate/ tests/ tools/ main.py
+	$(PYTHON) -m ruff format --check $(SOURCES)
 
 lint-markdown:
 	@echo "Checking markdown formatting..."
@@ -261,23 +333,29 @@ lint-markdown:
 
 lint-all: lint lint-format lint-markdown
 
-# Lint without markdown (for CI environments without Node.js)
 lint-no-markdown: lint lint-format
 
-# Complete code quality check: format, lint, and test (dev workflow shorthand)
+format: .ensure-ruff
+	@echo "Formatting code with ruff..."
+	$(PYTHON) -m ruff check --fix $(SOURCES)
+	$(PYTHON) -m ruff format $(SOURCES)
+
 check: format lint-all test
 
-format:
-	@echo "Formatting code with ruff..."
-	@if ! $(PYTHON) -c "import ruff" 2>/dev/null; then \
-		echo "⚠️  ruff not found. Run 'make setup' first to install dependencies."; \
-		exit 1; \
-	fi
-	$(PYTHON) -m ruff check --fix mealie_translate/ tests/ tools/ main.py
-	$(PYTHON) -m ruff format mealie_translate/ tests/ tools/ main.py
+# -----------------------------------------------------------------------------
+# CI Linting (system Python, no venv dependency checks)
+# -----------------------------------------------------------------------------
 
-# Pre-commit hooks
-pre-commit:
+ci-lint:
+	@echo "Running CI linting..."
+	python -m ruff check $(SOURCES)
+	npx pyright
+
+# -----------------------------------------------------------------------------
+# Pre-commit Hooks
+# -----------------------------------------------------------------------------
+
+pre-commit: .ensure-precommit
 	@echo "Installing pre-commit hooks..."
 	@echo "⚠️  WARNING: This will modify your git repository behavior!"
 	@echo ""
@@ -292,15 +370,11 @@ pre-commit:
 	@echo "  • To remove later: run 'pre-commit uninstall'"
 	@echo "  • Files modified: .git/hooks/pre-commit (and others)"
 	@echo ""
-	@if ! $(VENV_PATH)/bin/pre-commit --version >/dev/null 2>&1; then \
-		echo "⚠️  pre-commit not found. Run 'make setup' first to install dependencies."; \
-		exit 1; \
-	fi
 	@read -p "Do you want to install these git hooks? (y/N): " answer; \
 	if [ "$$answer" = "y" ] || [ "$$answer" = "Y" ]; then \
 		$(VENV_PATH)/bin/pre-commit install; \
 		echo "✅ Pre-commit hooks installed successfully"; \
-		echo "� Git hooks are now active and will run on every commit"; \
+		echo "🔒 Git hooks are now active and will run on every commit"; \
 		echo "💡 Test them with: pre-commit run --all-files"; \
 		echo "🗑️  Remove them with: pre-commit uninstall"; \
 	else \
@@ -308,25 +382,15 @@ pre-commit:
 		echo "💡 You can still run checks manually: make lint, make test, make format"; \
 	fi
 
-# Pre-commit hooks (force install for automation)
-pre-commit-force:
+pre-commit-force: .ensure-precommit
 	@echo "Installing pre-commit hooks (non-interactive)..."
 	@echo "⚠️  This will modify .git/hooks/ and change git behavior"
-	@if ! $(VENV_PATH)/bin/pre-commit --version >/dev/null 2>&1; then \
-		echo "⚠️  pre-commit not found. Run 'make setup' first to install dependencies."; \
-		exit 1; \
-	fi
 	$(VENV_PATH)/bin/pre-commit install
 	@echo "✅ Pre-commit hooks installed successfully"
 	@echo "🔒 Git hooks are now active for this repository"
 
-# Pre-commit hooks (uninstall)
-pre-commit-uninstall:
+pre-commit-uninstall: .ensure-precommit
 	@echo "Removing pre-commit hooks..."
-	@if ! $(VENV_PATH)/bin/pre-commit --version >/dev/null 2>&1; then \
-		echo "⚠️  pre-commit not found. Run 'make setup' first to install dependencies."; \
-		exit 1; \
-	fi
 	@if [ -f ".git/hooks/pre-commit" ]; then \
 		$(VENV_PATH)/bin/pre-commit uninstall; \
 		echo "✅ Pre-commit hooks removed successfully"; \
@@ -336,41 +400,38 @@ pre-commit-uninstall:
 		echo "ℹ️  No pre-commit hooks found to remove"; \
 	fi
 
-# Lightweight commands for pre-commit hooks (no echo, direct execution)
+# Lightweight commands for pre-commit hooks (minimal output)
 pre-commit-lint:
-	@$(PYTHON) -m ruff check mealie_translate/ tests/ main.py
+	@$(PYTHON) -m ruff check $(SOURCES)
 	@npx pyright
 
 pre-commit-format:
-	@$(PYTHON) -m ruff check --fix mealie_translate/ tests/ main.py
-	@$(PYTHON) -m ruff format mealie_translate/ tests/ main.py
+	@$(PYTHON) -m ruff check --fix $(SOURCES)
+	@$(PYTHON) -m ruff format $(SOURCES)
 
 pre-commit-test:
 	@$(PYTHON) -m pytest tests/ -m "not integration" -q
 
+# -----------------------------------------------------------------------------
 # Cleanup
+# -----------------------------------------------------------------------------
+
 clean:
 	@echo "Cleaning up generated files and caches..."
-	# Python cache files
-	find . -type d -name "__pycache__" -exec rm -rf {} +
-	# Test and coverage files
+	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	rm -rf .pytest_cache/
 	rm -rf htmlcov/
 	rm -rf .coverage
 	rm -rf coverage.xml
 	rm -f pytest-results*.xml
 	rm -f pytest-report*.html
-	# Build artifacts
 	rm -rf *.egg-info/
-	# Cache directories
 	rm -rf .ruff_cache/
 	rm -rf .tox/
-	# Security and audit reports
 	rm -f *-report.json
 	rm -f *-report.txt
 	@echo "✅ Cleanup complete"
 
-# Deep cleanup including virtual environment
 clean-all: clean
 	@echo "Performing deep cleanup..."
 	@echo "⚠️  This will remove the virtual environment and require 'make setup' to rebuild"
@@ -384,44 +445,35 @@ clean-all: clean
 		echo "⏭️  Deep cleanup cancelled"; \
 	fi
 
-# Run application
-run:
-	@if ! $(PYTHON) --version >/dev/null 2>&1; then \
-		echo "⚠️  Python not found at $(PYTHON). Run 'make setup' first."; \
-		exit 1; \
-	fi
+clean-force: clean
+	@echo "Performing deep cleanup (non-interactive)..."
+	rm -rf $(VENV_PATH)
+	rm -f .env
+	@echo "✅ Deep cleanup complete - virtual environment and .env removed"
+
+# -----------------------------------------------------------------------------
+# Application
+# -----------------------------------------------------------------------------
+
+run: .ensure-python
 	$(PYTHON) main.py
 
-# Model comparison tools
-compare-models:
-	@if ! $(PYTHON) --version >/dev/null 2>&1; then \
-		echo "⚠️  Python not found at $(PYTHON). Run 'make setup' first."; \
-		exit 1; \
-	fi
+compare-models: .ensure-python
 	$(PYTHON) tools/detailed_model_comparison.py
 
-compare-models-basic:
-	@if ! $(PYTHON) --version >/dev/null 2>&1; then \
-		echo "⚠️  Python not found at $(PYTHON). Run 'make setup' first."; \
-		exit 1; \
-	fi
+compare-models-basic: .ensure-python
 	$(PYTHON) tools/basic_model_comparison.py
 
-verify-prompts:
-	@if ! $(PYTHON) --version >/dev/null 2>&1; then \
-		echo "⚠️  Python not found at $(PYTHON). Run 'make setup' first."; \
-		exit 1; \
-	fi
+verify-prompts: .ensure-python
 	$(PYTHON) tools/verify_prompt_consistency.py
 
-generate-tags:
-	@if ! $(PYTHON) --version >/dev/null 2>&1; then \
-		echo "⚠️  Python not found at $(PYTHON). Run 'make setup' first."; \
-		exit 1; \
-	fi
+generate-tags: .ensure-python
 	$(PYTHON) tools/generate_tags.py $(ARGS)
 
-# Docker commands
+# -----------------------------------------------------------------------------
+# Docker
+# -----------------------------------------------------------------------------
+
 docker-build:
 	@echo "Building Docker image..."
 	docker build -t mealie-translator:latest .
@@ -457,24 +509,21 @@ docker-clean:
 	docker container prune -f
 	@echo "✅ Docker cleanup complete"
 
-# Security scanning
+# -----------------------------------------------------------------------------
+# Security
+# -----------------------------------------------------------------------------
+
 security-scan: security-bandit security-pip-audit
 	@echo "✅ All security scans completed"
 
-security-bandit:
-	@if ! $(PYTHON) -c "import bandit" 2>/dev/null; then \
-		echo "⚠️  bandit not found. Run 'make install-dev' first."; \
-		exit 1; \
-	fi
+security-bandit: .ensure-python
+	@$(PYTHON) -c "import bandit" 2>/dev/null || { echo "⚠️  bandit not found. Run 'make install-dev' first."; exit 1; }
 	@echo "Running bandit security scanner..."
 	$(PYTHON) -m bandit -r mealie_translate/ -f json -o bandit-report.json || true
 	$(PYTHON) -m bandit -r mealie_translate/ -f txt
 
-security-pip-audit:
-	@if ! $(PYTHON) -c "import pip_audit" 2>/dev/null; then \
-		echo "⚠️  pip-audit not found. Run 'make install-dev' first."; \
-		exit 1; \
-	fi
+security-pip-audit: .ensure-python
+	@$(PYTHON) -c "import pip_audit" 2>/dev/null || { echo "⚠️  pip-audit not found. Run 'make install-dev' first."; exit 1; }
 	@echo "Running pip-audit dependency vulnerability scanner..."
 	$(PYTHON) -m pip_audit --format=json --output=pip-audit-report.json || true
 	$(PYTHON) -m pip_audit --format=columns
