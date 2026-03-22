@@ -7,6 +7,7 @@ from openai import AsyncOpenAI
 
 from .config import Settings
 from .logger import get_logger
+from .unit_converter import convert_ingredients
 
 
 class RecipeTranslator:
@@ -197,33 +198,42 @@ Text to translate and convert: {text}
     async def _translate_ingredients(
         self, ingredients: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
-        """Translate recipe ingredients.
+        """Translate recipe ingredients and convert units.
+
+        This method performs two operations:
+        1. Converts structured unit fields (quantity, unit) from imperial to metric
+        2. Translates text fields (note, originalText) to the target language
+
+        The unit conversion uses deterministic conversion factors that match
+        the LLM prompts, ensuring consistency between structured and text data.
 
         Args:
             ingredients: List of ingredient dictionaries
 
         Returns:
-            List of translated ingredient dictionaries
+            List of translated ingredient dictionaries with converted units
         """
         if not ingredients:
             return ingredients
 
+        converted_ingredients = convert_ingredients(ingredients)
+
         ingredient_texts = []
-        for ingredient in ingredients:
+        for ingredient in converted_ingredients:
             if ingredient.get("note"):
                 ingredient_texts.append(ingredient["note"])
             if ingredient.get("originalText"):
                 ingredient_texts.append(ingredient["originalText"])
 
         if not ingredient_texts:
-            return ingredients
+            return converted_ingredients
 
         translated_texts = await self._translate_ingredient_batch(ingredient_texts)
 
         translated_ingredients = []
         text_index = 0
 
-        for ingredient in ingredients:
+        for ingredient in converted_ingredients:
             translated_ingredient = ingredient.copy()
 
             if ingredient.get("note"):
