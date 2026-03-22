@@ -445,6 +445,47 @@ python tools/verify_prompt_consistency.py
 
 This section documents the ChatGPT and Mealie API optimizations implemented to improve the recipe translation process.
 
+### HTTP/2 Protocol Support
+
+**Enhancement**: All HTTP clients use HTTP/2 for improved performance.
+
+**Why HTTP/2?**
+
+- **Multiplexing**: Multiple requests share a single TCP connection
+- **Header Compression**: Reduces overhead for repeated headers (auth tokens, content-type)
+- **Connection Reuse**: No handshake overhead for subsequent requests
+
+**Implementation Pattern:**
+
+When adding new API clients (e.g., new LLM providers), always enable HTTP/2:
+
+```python
+import httpx
+
+# For standalone httpx clients (like MealieClient)
+client = httpx.AsyncClient(
+    http2=True,
+    headers={...},
+    timeout=httpx.Timeout(30.0, read=60.0),
+)
+
+# For OpenAI SDK or similar libraries that accept custom httpx clients
+import httpx
+from openai import AsyncOpenAI
+
+http_client = httpx.AsyncClient(http2=True)
+client = AsyncOpenAI(
+    api_key=api_key,
+    http_client=http_client,
+)
+```
+
+**Dependency**: Requires `httpx[http2]` which installs `h2`, `hpack`, and `hyperframe` packages.
+
+**Fallback**: If the server doesn't support HTTP/2, httpx automatically falls back to HTTP/1.1.
+
+**Performance Impact**: ~2x faster for concurrent requests (e.g., fetching 100+ recipe details).
+
 ### REST API Optimizations
 
 #### Smart Recipe Filtering

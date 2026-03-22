@@ -25,6 +25,23 @@ Do not oversimplify or suggest removing existing infrastructure.
 - **Type hints**: Required for all public functions
 - **Logging**: Use `get_logger(__name__)` — NO `print` statements in production code
 - **Security**: `bandit` + `pip-audit` for vulnerability scanning
+- **HTTP Clients**: Always use `http2=True` for httpx clients (see below)
+
+## 🌐 HTTP Client Guidelines
+
+When creating HTTP clients for external APIs (Mealie, OpenAI, new LLM providers):
+
+```python
+# Standalone httpx client
+client = httpx.AsyncClient(http2=True, ...)
+
+# OpenAI SDK or similar with custom client
+http_client = httpx.AsyncClient(http2=True)
+sdk_client = AsyncOpenAI(http_client=http_client, ...)
+```
+
+This ensures multiplexing, header compression, and connection reuse for all API calls.
+See `docs/DEVELOPMENT.md` for full implementation details.
 
 ## 🔀 Git Conventions
 
