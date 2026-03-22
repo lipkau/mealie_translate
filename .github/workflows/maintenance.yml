@@ -165,15 +165,22 @@ jobs:
               -f dismissed_reason="won't fix" \
               -f dismissed_comment="Auto-dismissed: Stale Trivy alert (base image CVE older than ${AGE_DAYS} days)" \
               > /dev/null 2>&1; then
-              ((DISMISSED++))
+              DISMISSED=$((DISMISSED + 1))
             else
-              ((FAILED++))
+              FAILED=$((FAILED + 1))
               echo "⚠️ Failed to dismiss alert #$ALERT_NUM"
             fi
 
             # Progress indicator every 50 alerts
-            if (( (DISMISSED + FAILED) % 50 == 0 )); then
-              echo "Progress: $((DISMISSED + FAILED))/$OLD_COUNT alerts processed..."
+            PROCESSED=$((DISMISSED + FAILED))
+            if (( PROCESSED % 50 == 0 )); then
+              echo "Progress: $PROCESSED/$OLD_COUNT alerts processed..."
+            fi
+
+            # Rate limit protection: pause briefly every 100 requests
+            if (( PROCESSED % 100 == 0 )); then
+              echo "⏳ Pausing to avoid rate limits..."
+              sleep 2
             fi
           done
 
