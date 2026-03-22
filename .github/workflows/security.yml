@@ -213,6 +213,9 @@ jobs:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev
           format: "sarif"
           output: "trivy-results-dev.sarif"
+          severity: "HIGH,CRITICAL"
+          ignore-unfixed: true
+          vuln-type: "os,library"
 
       - name: Upload Trivy scan results to GitHub Security tab
         if: steps.image-check.outputs.exists == 'true'
@@ -260,6 +263,9 @@ jobs:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           format: "sarif"
           output: "trivy-results-latest.sarif"
+          severity: "HIGH,CRITICAL"
+          ignore-unfixed: true
+          vuln-type: "os,library"
 
       - name: Upload Trivy scan results to GitHub Security tab
         if: steps.image-check.outputs.exists == 'true'
@@ -406,6 +412,9 @@ jobs:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           format: "sarif"
           output: "trivy-results.sarif"
+          severity: "HIGH,CRITICAL"
+          ignore-unfixed: true
+          vuln-type: "os,library"
 
       - name: Upload Trivy scan results to GitHub Security tab
         if: steps.trivy-image-check.outputs.exists == 'true'

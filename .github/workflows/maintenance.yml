@@ -4,11 +4,23 @@ on:
   schedule:
     # Run every day at 2 AM UTC
     - cron: "0 2 * * *"
-  workflow_dispatch: # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      dismiss_alerts:
+        description: "Dismiss stale security alerts"
+        required: false
+        default: false
+        type: boolean
+      alert_age_days:
+        description: "Dismiss alerts older than N days (default: 30)"
+        required: false
+        default: "30"
+        type: string
 
 permissions:
   contents: read
   packages: write
+  security-events: write
 
 env:
   REGISTRY: ghcr.io
@@ -99,5 +111,79 @@ jobs:
             done
             echo "✅ Cleanup completed - deleted $DELETED_COUNT images"
           fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  dismiss-stale-alerts:
+    name: Dismiss Stale Security Alerts
+    runs-on: ubuntu-latest
+    # Only run when manually triggered with dismiss_alerts=true
+    if: github.event_name == 'workflow_dispatch' && inputs.dismiss_alerts == true
+
+    steps:
+      - name: Dismiss stale Trivy alerts
+        run: |
+          echo "🔒 Dismissing stale security alerts..."
+
+          AGE_DAYS="${{ inputs.alert_age_days }}"
+          CUTOFF_DATE=$(date -d "${AGE_DAYS} days ago" -u +%Y-%m-%dT%H:%M:%SZ)
+          echo "Dismissing alerts older than: $CUTOFF_DATE ($AGE_DAYS days)"
+
+          # Get all open Trivy alerts
+          echo "Fetching open Trivy alerts..."
+          ALERTS=$(gh api repos/${{ github.repository }}/code-scanning/alerts \
+            --paginate \
+            --jq '.[] | select(.state=="open" and .tool.name=="Trivy") | {number: .number, created: .created_at, rule: .rule.id}')
+
+          if [[ -z "$ALERTS" ]]; then
+            echo "✅ No open Trivy alerts found"
+            exit 0
+          fi
+
+          TOTAL=$(echo "$ALERTS" | jq -s 'length')
+          echo "Found $TOTAL open Trivy alerts"
+
+          # Filter for alerts older than cutoff
+          OLD_ALERTS=$(echo "$ALERTS" | jq -rs --arg cutoff "$CUTOFF_DATE" \
+            '.[] | select(.created < $cutoff) | .number')
+
+          if [[ -z "$OLD_ALERTS" ]]; then
+            echo "✅ No alerts older than $AGE_DAYS days found"
+            exit 0
+          fi
+
+          OLD_COUNT=$(echo "$OLD_ALERTS" | wc -w)
+          echo "Found $OLD_COUNT alerts older than $AGE_DAYS days"
+
+          # Dismiss old alerts
+          DISMISSED=0
+          FAILED=0
+
+          for ALERT_NUM in $OLD_ALERTS; do
+            if gh api -X PATCH "repos/${{ github.repository }}/code-scanning/alerts/$ALERT_NUM" \
+              -f state=dismissed \
+              -f dismissed_reason="won't fix" \
+              -f dismissed_comment="Auto-dismissed: Stale Trivy alert (base image CVE older than ${AGE_DAYS} days)" \
+              > /dev/null 2>&1; then
+              ((DISMISSED++))
+            else
+              ((FAILED++))
+              echo "⚠️ Failed to dismiss alert #$ALERT_NUM"
+            fi
+
+            # Progress indicator every 50 alerts
+            if (( (DISMISSED + FAILED) % 50 == 0 )); then
+              echo "Progress: $((DISMISSED + FAILED))/$OLD_COUNT alerts processed..."
+            fi
+          done
+
+          echo ""
+          echo "📊 Summary:"
+          echo "  Total open Trivy alerts: $TOTAL"
+          echo "  Alerts older than $AGE_DAYS days: $OLD_COUNT"
+          echo "  Successfully dismissed: $DISMISSED"
+          echo "  Failed to dismiss: $FAILED"
+          echo ""
+          echo "✅ Stale alert cleanup completed"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

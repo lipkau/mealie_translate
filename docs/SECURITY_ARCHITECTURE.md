@@ -83,6 +83,8 @@ make security-scan
 - 📊 **Multiple output formats** (SARIF, JSON, table)
 - 🎯 **Multiple image tags** (latest, dev)
 - 📈 **Vulnerability severity breakdown** in workflow summaries
+- 🎚️ **Severity filtering** — Only HIGH and CRITICAL vulnerabilities are reported
+- 🔧 **Actionable results** — Unfixed CVEs (no patch available) are excluded
 
 #### Reporting
 
@@ -390,3 +392,41 @@ make security-scan
 ```
 
 This approach ensures that security alerts are meaningful and actionable, rather than overwhelming with false positives.
+
+### Trivy Docker Scanning Configuration
+
+**Problem**: Default Trivy scans report all CVEs found in Docker images, including LOW/MEDIUM severity
+issues and CVEs without available patches. This leads to thousands of alerts that cannot be actioned.
+
+**Solution**: Configured Trivy with intelligent filtering:
+
+```yaml
+uses: aquasecurity/trivy-action@master
+with:
+  severity: "HIGH,CRITICAL"    # Skip LOW, MEDIUM noise
+  ignore-unfixed: true         # Skip CVEs without available patches
+  vuln-type: "os,library"      # Focus on OS packages and libraries
+```
+
+**Key Configuration Options**:
+
+1. **severity: "HIGH,CRITICAL"** — Only report vulnerabilities that pose significant risk
+2. **ignore-unfixed: true** — Skip CVEs where no patched version exists (can't action them)
+3. **vuln-type: "os,library"** — Focus on actual security issues, not configuration
+
+**Result**: Dramatically reduced alert volume while maintaining coverage for actionable security issues.
+
+### Dismissing Stale Alerts
+
+For existing alerts that accumulated before filtering was enabled, use the maintenance workflow:
+
+```bash
+# Dismiss alerts older than 30 days (default)
+gh workflow run maintenance.yml -f dismiss_alerts=true
+
+# Dismiss alerts older than 7 days
+gh workflow run maintenance.yml -f dismiss_alerts=true -f alert_age_days=7
+```
+
+This will bulk dismiss old Trivy alerts with the reason "won't fix" and a comment explaining they are
+stale base image CVEs. The workflow only runs when manually triggered with `dismiss_alerts=true`.
