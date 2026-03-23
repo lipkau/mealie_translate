@@ -73,7 +73,7 @@ jobs:
           fail_ci_if_error: false
 
       - name: Publish Test Results
-        uses: dorny/test-reporter@v2
+        uses: dorny/test-reporter@v3
         if: always()
         with:
           name: Test Results (Coverage)
@@ -124,7 +124,7 @@ jobs:
           python -m pytest tests/ -v -m "not integration" --junit-xml=pytest-results-${{ matrix.python-version }}.xml
 
       - name: Publish Test Results
-        uses: dorny/test-reporter@v2
+        uses: dorny/test-reporter@v3
         if: always()
         with:
           name: Test Results (Python ${{ matrix.python-version }})
@@ -168,7 +168,7 @@ jobs:
           make test-integration PYTHON=python
 
       - name: Publish Integration Test Results
-        uses: dorny/test-reporter@v2
+        uses: dorny/test-reporter@v3
         if: always()
         with:
           name: Integration Test Results
