@@ -16,7 +16,13 @@ make lint-markdown     # Run markdownlint (requires npm install)
 npm install            # Install Node.js deps if not already done
 ```
 
-The markdownlint configuration is in [`.markdownlint.json`](../../../.markdownlint.json).
+The markdownlint configuration is in [`.markdownlint-cli2.jsonc`](../../../.markdownlint-cli2.jsonc).
+
+When the request is simply "update documentation", treat that as a docs-sync task:
+
+- Update the relevant files in `docs/`, `README.md`, or contributor-facing guidance.
+- Keep examples and commands aligned with the current code and Makefile targets.
+- If a new doc file is added, include it in [`docs/README.md`](../../../docs/README.md).
 
 ## Style Rules
 
