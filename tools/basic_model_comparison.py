@@ -20,13 +20,6 @@ from typing import Any
 project_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(project_dir))
 
-from _model_comparison_data import (
-    AVAILABLE_MODELS,
-    CATEGORY_TEST_CASES,
-    TAG_TEST_CASES,
-    UNIT_TEST_CASES,
-)
-
 from mealie_translate.config import get_settings
 from mealie_translate.organizer import (
     ALLOWED_CATEGORIES,
@@ -34,6 +27,12 @@ from mealie_translate.organizer import (
     TAG_GENERATION_PROMPT,
 )
 from mealie_translate.translator import RecipeTranslator
+from tools._model_comparison_data import (
+    AVAILABLE_MODELS,
+    CATEGORY_TEST_CASES,
+    TAG_TEST_CASES,
+    UNIT_TEST_CASES,
+)
 
 
 class ModelComparison:
@@ -45,14 +44,7 @@ class ModelComparison:
             raise ValueError("OpenAI API key is required for model comparison")
 
         self.models = AVAILABLE_MODELS
-        self.unit_cases = [
-            {
-                "name": tc["name"],
-                "input": tc["input"],
-                "expected_elements": tc["key_elements"],
-            }
-            for tc in UNIT_TEST_CASES
-        ]
+        self.unit_cases = UNIT_TEST_CASES
         self.tag_cases = TAG_TEST_CASES
         self.category_cases = CATEGORY_TEST_CASES
 
@@ -88,11 +80,7 @@ class ModelComparison:
                 )
                 elapsed = time.time() - start
                 total_time += elapsed
-                missing = [
-                    e
-                    for e in tc["expected_elements"]
-                    if e.lower() not in output.lower()
-                ]
+                missing = [e for e in tc["key_elements"] if e.lower() not in output.lower()]
                 passed = len(missing) == 0
                 if passed:
                     print(f"✅ ({elapsed:.2f}s)")

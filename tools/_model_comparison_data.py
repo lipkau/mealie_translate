@@ -5,9 +5,60 @@ and detailed_model_comparison.py, ensuring consistency and eliminating
 duplication.
 """
 
+from typing import TypedDict
+
 from mealie_translate.organizer import ALLOWED_CATEGORIES
 
-AVAILABLE_MODELS = [
+
+class UnitTestCase(TypedDict):
+    """Unit-conversion comparison case."""
+
+    name: str
+    input: str
+    expected_output: str
+    key_elements: list[str]
+
+
+class ComparisonRecipe(TypedDict):
+    """Recipe payload used to render comparison prompts."""
+
+    name: str
+    description: str
+    ingredients: str
+    available_tags: str
+    existing_categories: str
+    existing_tags: str
+
+
+class TagTestCase(TypedDict):
+    """Tag-generation comparison case."""
+
+    name: str
+    recipe: ComparisonRecipe
+    expected_tags: list[str]
+    forbidden: list[str]
+
+
+class CategoryRecipe(TypedDict):
+    """Recipe payload for category-generation prompts."""
+
+    name: str
+    description: str
+    ingredients: str
+    existing_tags: str
+    existing_categories: str
+
+
+class CategoryTestCase(TypedDict):
+    """Category-generation comparison case."""
+
+    name: str
+    recipe: CategoryRecipe
+    expected_categories: list[str]
+    must_not_include: list[str]
+
+
+AVAILABLE_MODELS: list[str] = [
     "gpt-5.4-nano",
     "gpt-5.4-mini",
     "gpt-5.4",
@@ -18,7 +69,7 @@ AVAILABLE_MODELS = [
     "gpt-4o",
 ]
 
-UNIT_TEST_CASES = [
+UNIT_TEST_CASES: list[UnitTestCase] = [
     {
         "name": "Fraction: 3/4 cup",
         "input": "3/4 cup all-purpose flour",
@@ -65,7 +116,7 @@ UNIT_TEST_CASES = [
 
 _CATEGORY_WORD_LIST = sorted(ALLOWED_CATEGORIES)
 
-TAG_TEST_CASES = [
+TAG_TEST_CASES: list[TagTestCase] = [
     {
         "name": "Carbonara — cuisine + no category bleed",
         "recipe": {
@@ -94,7 +145,7 @@ TAG_TEST_CASES = [
     },
 ]
 
-CATEGORY_TEST_CASES = [
+CATEGORY_TEST_CASES: list[CategoryTestCase] = [
     {
         "name": "Chocolate Lava Cake → dessert",
         "recipe": {

@@ -3,6 +3,8 @@
 import logging
 import sys
 
+LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
 
 def setup_logging(
     log_level: str = "INFO", log_file: str | None = None
@@ -29,21 +31,17 @@ def setup_logging(
     # root.handlers` would be False in tests even when ours isn't there yet.
     has_stdout_handler = any(type(h) is logging.StreamHandler for h in root.handlers)
     if not has_stdout_handler:
-        console_formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
+        console_formatter = logging.Formatter(LOG_FORMAT)
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setLevel(level)
         console_handler.setFormatter(console_formatter)
         root.addHandler(console_handler)
 
     if log_file:
-        console_formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
+        file_formatter = logging.Formatter(LOG_FORMAT)
         file_handler = logging.FileHandler(log_file)
         file_handler.setLevel(logging.DEBUG)
-        file_handler.setFormatter(console_formatter)
+        file_handler.setFormatter(file_formatter)
         root.addHandler(file_handler)
 
     # Also keep the named logger for backwards compatibility.
