@@ -34,7 +34,7 @@ This directory contains all project documentation for the Mealie Recipe Translat
 
 ### Setup & Installation
 
-- [Local Setup](../README.md#installation)
+- [Local Setup](../README.md#local-development)
 - [Docker Setup](DOCKER.md#quick-start)
 - [Environment Configuration](../README.md#configuration)
 
@@ -45,8 +45,8 @@ This directory contains all project documentation for the Mealie Recipe Translat
 - [API Optimizations](DEVELOPMENT.md#implementation-optimizations)
 - [CI/CD Pipeline](CI_CD_ARCHITECTURE.md)
 - [Security Architecture](SECURITY_ARCHITECTURE.md)
-- [Testing](../README.md#testing)
-- [Contributing Guidelines](../README.md#contributing)
+- [Testing](DEVELOPMENT.md#testing-commands)
+- [Contributing Guidelines](../.github/CONTRIBUTING.md)
 
 ### Deployment
 

@@ -10,7 +10,7 @@ This is an open source project and contributions are welcome.
 2. **Clone your fork** → `git clone https://github.com/YOUR-USERNAME/mealie_translate.git`
 3. **Set up development** → `make setup-full`
 4. **Create a feature branch** → `git checkout -b feature/your-feature`
-5. **Make changes and test** → `make test && make lint`
+5. **Make changes and validate** → `make format && make lint && make test-unit`
 6. **Submit a pull request** → Push to your fork and [create PR](https://github.blog/developer-skills/github/beginners-guide-to-github-creating-a-pull-request/)
 
 **📋 Detailed Setup Guide**:
@@ -94,7 +94,7 @@ Enhancement suggestions are welcome! Please use the feature request template and
    make help         # See all available commands
    ```
 
-> **📋 Detailed Setup**: For complete installation instructions, see the [README Installation section](../README.md#installation).
+> **📋 Detailed Setup**: For complete installation instructions, see the [README Local Development section](../README.md#local-development).
 
 ### Development Commands
 
@@ -107,6 +107,8 @@ make format         # Auto-format code (ruff)
 make lint           # Check code quality (ruff, pyright)
 make test           # Full test suite before committing
 ```
+
+If you update Markdown files, also run `make lint-markdown`.
 
 > **📋 Complete Command Reference**: Run `make help` or see [DEVELOPMENT.md](../docs/DEVELOPMENT.md) for all available commands.
 
@@ -249,8 +251,9 @@ python -m pytest tests/test_translator.py::test_translate_recipe -v
 5. **Run the full test suite:**
 
    ```bash
-   make test
+   make format
    make lint
+   make test
    ```
 
 6. **Commit your changes** with clear commit messages:

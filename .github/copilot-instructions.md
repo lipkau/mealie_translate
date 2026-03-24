@@ -56,6 +56,8 @@ Copilot loads the relevant skill automatically, or invoke one manually with `/sk
 
 | Skill | When it is used |
 | --- | --- |
+| `/cleanup` | Repo maintenance passes: dead code, stale TODOs, redundant code, safe cleanup |
+| `/refactor` | Behavior-preserving code refactors focused on readability and structure |
 | `/use-makefile` | Running any development task (tests, lint, format, Docker, …) |
 | `/python-venv` | Running Python directly without a `make` target |
 | `/deployment` | Creating a release, pushing a version tag, understanding the CD pipeline |
@@ -63,6 +65,21 @@ Copilot loads the relevant skill automatically, or invoke one manually with `/sk
 | `/write-documentation` | Creating or editing Markdown files in `docs/` |
 | `/add-dependencies` | Adding Python or Node.js packages |
 | `/write-tests` | Writing unit or integration tests |
+
+## 🎯 Preferred Copilot Steering
+
+Use short intent-focused prompts and rely on repo skills for the workflow details.
+
+- "update documentation" → `/write-documentation`
+- "refactor `mealie_translate/recipe_processor.py`" → `/refactor`
+- "clean up `mealie_translate/`" → `/cleanup`
+
+When using these skills:
+
+- Prefer behavior-preserving changes over broad rewrites.
+- Validate code changes with `make format`, `make lint`, and `make test-unit`.
+- Validate documentation changes with `make lint-markdown`.
+- Treat "tree shaking" in this Python repo as dead-code elimination, not frontend bundler optimization.
 
 ## 📚 Key Documentation
 
