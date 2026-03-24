@@ -34,8 +34,6 @@ ALLOWED_CATEGORIES: frozenset[str] = frozenset(
     }
 )
 
-EXTRAS_ORGANISED_KEY: str = "organised"
-
 # ── LLM prompts ────────────────────────────────────────────────────────────
 
 TAG_GENERATION_PROMPT = """You are a recipe tagging expert. Analyze the following recipe and generate 3-8 relevant tags.
@@ -381,6 +379,7 @@ class RecipeOrganizer:
     def __init__(self, settings: Settings | None = None, dry_run: bool = False) -> None:
         """Initialise the organiser."""
         self.settings = settings or get_settings()
+        self.organised_tag = self.settings.organised_tag
         self.mealie_client = MealieClient(self.settings)
         self.translator = RecipeTranslator(self.settings)
         self.logger = get_logger(__name__)
@@ -398,18 +397,16 @@ class RecipeOrganizer:
         """Exit async context manager."""
         await self.mealie_client.__aexit__(exc_type, exc_val, exc_tb)
 
-    @staticmethod
-    def is_organised(recipe: dict[str, Any]) -> bool:
+    def is_organised(self, recipe: dict[str, Any]) -> bool:
         """Return True if this recipe has already been organised."""
         extras = recipe.get("extras") or {}
-        return str(extras.get(EXTRAS_ORGANISED_KEY, "")).lower() in {"true", "1"}
+        return str(extras.get(self.organised_tag, "")).lower() in {"true", "1"}
 
-    @staticmethod
-    def _mark_as_organised(recipe: dict[str, Any]) -> None:
-        """Stamp extras.organised = 'true' into the recipe dict in-place."""
+    def _mark_as_organised(self, recipe: dict[str, Any]) -> None:
+        """Stamp the configured organisation marker into the recipe dict in-place."""
         if "extras" not in recipe:
             recipe["extras"] = {}
-        recipe["extras"][EXTRAS_ORGANISED_KEY] = "true"
+        recipe["extras"][self.organised_tag] = "true"
 
     async def process_recipe(
         self,

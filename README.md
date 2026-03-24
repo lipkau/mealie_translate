@@ -19,7 +19,7 @@ imperial units to metric.
 
 - **🌍 Recipe Translation**: Translates titles, descriptions, instructions, and ingredients
 - **📏 Unit Conversion**: Automatically converts imperial units (cups, pounds, °F) to metric (ml, grams, °C)
-- **⚡ Batch Processing**: Processes all untagged recipes in configurable batches for efficiency
+- **⚡ Batch Processing**: Processes unprocessed recipes in configurable batches for efficiency
 - **🔄 Smart Tracking**: Prevents duplicate processing using recipe extras field
 - **⏰ Automated Scheduling**: Configurable cron-based execution to translate new recipes
 - **🛠️ Error Handling**: Robust retry logic with exponential backoff
@@ -71,21 +71,22 @@ docker compose up -d
 
 Set these environment variables:
 
-| Variable                       | Description                              | Example                         |
-| ------------------------------ | ---------------------------------------- | ------------------------------- |
-| `MEALIE_BASE_URL`              | Your Mealie server URL                   | `https://mealie.yourdomain.com` |
-| `MEALIE_API_TOKEN`             | Mealie API token                         | `your-api-token-here`           |
-| `OPENAI_API_KEY`               | OpenAI API key                           | `sk-...`                        |
-| `OPENAI_MODEL`                 | OpenAI Model                             | `gpt-4o-mini`                   |
-| `TARGET_LANGUAGE`              | Language to translate to                 | `English`                       |
-| `PROCESSED_TAG`                | Tag for processed recipes                | `translated`                    |
-| `BATCH_SIZE`                   | Number of recipes to process in parallel | `10`                            |
-| `CRON_SCHEDULE`                | Schedule for automatic runs              | `0 */6 * * *` (every 6 hours)   |
-| `MAX_RETRIES`                  | Retry attempts for failed API calls      | `3`                             |
-| `RETRY_DELAY`                  | Base delay between retries in seconds    | `1`                             |
-| `MAX_CONCURRENT_REQUESTS`      | Max parallel Mealie API calls            | `5`                             |
-| `MAX_CONCURRENT_TRANSLATIONS`  | Max parallel OpenAI API calls            | `3`                             |
-| `DRY_RUN`                      | Preview mode - no changes saved          | `false`                         |
+| Variable                      | Description                               | Example                         |
+| ----------------------------- | ----------------------------------------- | ------------------------------- |
+| `MEALIE_BASE_URL`             | Your Mealie server URL                    | `https://mealie.yourdomain.com` |
+| `MEALIE_API_TOKEN`            | Mealie API token                          | `your-api-token-here`           |
+| `OPENAI_API_KEY`              | OpenAI API key                            | `sk-...`                        |
+| `OPENAI_MODEL`                | OpenAI Model                              | `gpt-4o-mini`                   |
+| `TARGET_LANGUAGE`             | Language to translate to                  | `English`                       |
+| `PROCESSED_TAG`               | Extras key used to mark processed recipes | `translated`                    |
+| `ORGANISED_TAG`               | Extras key used to mark organised recipes | `organised`                     |
+| `BATCH_SIZE`                  | Number of recipes to process in parallel  | `10`                            |
+| `CRON_SCHEDULE`               | Schedule for automatic runs               | `0 */6 * * *` (every 6 hours)   |
+| `MAX_RETRIES`                 | Retry attempts for failed API calls       | `3`                             |
+| `RETRY_DELAY`                 | Base delay between retries in seconds     | `1`                             |
+| `MAX_CONCURRENT_REQUESTS`     | Max parallel Mealie API calls             | `5`                             |
+| `MAX_CONCURRENT_TRANSLATIONS` | Max parallel OpenAI API calls             | `3`                             |
+| `DRY_RUN`                     | Preview mode - no changes saved           | `false`                         |
 
 **Getting API tokens:**
 
@@ -155,6 +156,10 @@ For more details, see the documentation or the `tools/` directory for model eval
 3. **Translates content** using OpenAI's ChatGPT
 4. **Converts units** from imperial to metric
 5. **Updates recipes** in Mealie with translated content
+
+Processed recipes are tracked via the recipe `extras` field using the configured `PROCESSED_TAG` key.
+
+Organised recipes are tracked separately after tag/category generation using the configured `ORGANISED_TAG` key.
 
 ## Support
 

@@ -15,6 +15,7 @@ def test_settings_creation():
     settings = Settings()
     assert settings.target_language == "English"
     assert settings.processed_tag == "translated"
+    assert settings.organised_tag == "organised"
     assert settings.batch_size == 10
     assert settings.max_retries == 3
     assert settings.retry_delay == 1.0
@@ -55,6 +56,7 @@ def test_settings_environment_loading():
         "OPENAI_API_KEY": "test_key",
         "TARGET_LANGUAGE": "spanish",
         "PROCESSED_TAG": "test_tag",
+        "ORGANISED_TAG": "organised_flag",
     }
 
     original_env = {}
@@ -69,6 +71,7 @@ def test_settings_environment_loading():
         assert settings.openai_api_key == "test_key"
         assert settings.target_language == "Spanish"
         assert settings.processed_tag == "test_tag"
+        assert settings.organised_tag == "organised_flag"
     finally:
         for key, value in original_env.items():
             if value is None:

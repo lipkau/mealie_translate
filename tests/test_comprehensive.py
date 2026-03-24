@@ -166,6 +166,16 @@ class TestMealieClientEdgeCases:
             result = client.is_recipe_processed(recipe)
             assert result == expected, f"Failed for recipe: {recipe}"
 
+    def test_recipe_processed_check_uses_custom_marker(self, mock_settings):
+        """Test processed-marker checks honor the configured extras key."""
+        custom_settings = mock_settings.model_copy(
+            update={"processed_tag": "done_flag"}
+        )
+        client = MealieClient(custom_settings)
+
+        assert client.is_recipe_processed({"extras": {"done_flag": "1"}}) is True
+        assert client.is_recipe_processed({"extras": {"translated": "true"}}) is False
+
 
 @pytest.mark.integration
 class TestRealAPICompatibility:

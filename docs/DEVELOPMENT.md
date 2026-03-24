@@ -533,7 +533,7 @@ read_only_fields = ['id', 'userId', 'householdId', 'groupId', 'createdAt', 'upda
 
 #### Smart Recipe Tracking
 
-**Enhancement**: Uses the `extras` field to mark processed recipes with `"translated": "true"`.
+**Enhancement**: Uses the configured `PROCESSED_TAG` extras key to mark processed recipes.
 
 **Before**: Used tags to mark processed recipes, which could interfere with Mealie's UI functionality.
 
@@ -543,7 +543,24 @@ read_only_fields = ['id', 'userId', 'householdId', 'groupId', 'createdAt', 'upda
 
 ```python
 # Recipe marked as processed in extras field
-recipe['extras'] = {'translated': 'true'}
+recipe['extras'] = {settings.processed_tag: 'true'}
+```
+
+#### Organisation Tracking
+
+**Enhancement**: Tracks tag/category generation separately from translation status.
+
+**Implementation**: After the organiser runs successfully, recipes are stamped with the configured
+`ORGANISED_TAG` extras key.
+
+**Why separate markers**: Translation completion and tag/category generation are different stages.
+Keeping separate extras markers allows the app to skip already translated recipes independently from already organised ones.
+
+**Note**: `ORGANISED_TAG` is configurable in the same way as `PROCESSED_TAG`.
+
+```python
+# Recipe marked as organised after tag/category generation
+recipe['extras'] = {settings.organised_tag: 'true'}
 ```
 
 #### Batch Processing Efficiency

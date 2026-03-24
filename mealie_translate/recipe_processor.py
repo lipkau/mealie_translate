@@ -163,15 +163,13 @@ class RecipeProcessor:
             if self.mealie_client.is_recipe_processed(recipe):
                 self.logger.info(
                     f"Recipe {recipe_slug} is already processed "
-                    "(has 'translated' in extras)"
+                    "(matches configured processed marker in extras)"
                 )
                 return True
 
             translated_recipe = await self.translator.translate_recipe(recipe)
 
-            if "extras" not in translated_recipe:
-                translated_recipe["extras"] = {}
-            translated_recipe["extras"]["translated"] = "true"
+            self.mealie_client.set_recipe_processed_marker(translated_recipe)
 
             if self.dry_run:
                 self.logger.info(
@@ -238,9 +236,7 @@ class RecipeProcessor:
 
             translated_recipe = await self._translate_with_semaphore(recipe)
 
-            if "extras" not in translated_recipe:
-                translated_recipe["extras"] = {}
-            translated_recipe["extras"]["translated"] = "true"
+            self.mealie_client.set_recipe_processed_marker(translated_recipe)
 
             if self.dry_run:
                 self.logger.info(
