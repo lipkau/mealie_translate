@@ -80,7 +80,9 @@ class ModelComparison:
                 )
                 elapsed = time.time() - start
                 total_time += elapsed
-                missing = [e for e in tc["key_elements"] if e.lower() not in output.lower()]
+                missing = [
+                    e for e in tc["key_elements"] if e.lower() not in output.lower()
+                ]
                 passed = len(missing) == 0
                 if passed:
                     print(f"✅ ({elapsed:.2f}s)")
