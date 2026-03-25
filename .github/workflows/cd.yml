@@ -83,6 +83,14 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.dev_tags.outputs.tags }}
+          annotations: |
+            index:org.opencontainers.image.title=Mealie Recipe Translator
+            index:org.opencontainers.image.description=Translates Mealie recipes using LLMs and converts imperial units to metric
+            index:org.opencontainers.image.url=https://github.com/lipkau/mealie_translate
+            index:org.opencontainers.image.source=https://github.com/lipkau/mealie_translate
+            index:org.opencontainers.image.documentation=https://github.com/lipkau/mealie_translate#readme
+            index:org.opencontainers.image.licenses=MIT
+            index:org.opencontainers.image.vendor=Oliver Lipkau
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -113,5 +121,13 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.find_tag.outputs.tag }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          annotations: |
+            index:org.opencontainers.image.title=Mealie Recipe Translator
+            index:org.opencontainers.image.description=Translates Mealie recipes using LLMs and converts imperial units to metric
+            index:org.opencontainers.image.url=https://github.com/lipkau/mealie_translate
+            index:org.opencontainers.image.source=https://github.com/lipkau/mealie_translate
+            index:org.opencontainers.image.documentation=https://github.com/lipkau/mealie_translate#readme
+            index:org.opencontainers.image.licenses=MIT
+            index:org.opencontainers.image.vendor=Oliver Lipkau
           cache-from: type=gha
           cache-to: type=gha,mode=max
