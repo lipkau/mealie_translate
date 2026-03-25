@@ -51,7 +51,7 @@ Examples:
     args = parser.parse_args()
 
     try:
-        settings = get_settings()
+        settings = get_settings(args.config)
 
         if not settings.mealie_base_url:
             logger.error("Error: MEALIE_BASE_URL not configured")

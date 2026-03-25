@@ -1,5 +1,7 @@
 """Configuration management for the Mealie Recipe Translator."""
 
+from typing import Any
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
@@ -51,6 +53,17 @@ class Settings(BaseSettings):
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 
-def get_settings() -> Settings:
-    """Get application settings instance."""
-    return Settings()
+def get_settings(env_file: str | None = None) -> Settings:
+    """Get application settings instance.
+
+    Args:
+        env_file: Optional path to an env file that overrides the default `.env`
+
+    Returns:
+        Loaded settings instance
+    """
+    if env_file is None:
+        return Settings()
+
+    settings_kwargs: dict[str, Any] = {"_env_file": env_file}
+    return Settings(**settings_kwargs)
