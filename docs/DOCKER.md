@@ -57,12 +57,12 @@ The project automatically publishes Docker images to GitHub Container Registry (
 
 ### Image Tags
 
-| Tag      | Description                             | When Updated             |
-| -------- | --------------------------------------- | ------------------------ |
-| `latest` | Latest stable release from main branch  | Every push to main       |
-| `dev`    | Development build with dev dependencies | Every push to main       |
-| `v1.0.0` | Specific version tags                   | When git tags are pushed |
-| `main`   | Latest commit on main branch            | Every push to main       |
+| Tag       | Description                              | When Updated                  |
+| --------- | ---------------------------------------- | ----------------------------- |
+| `dev`     | Development build with dev dependencies  | Push to main / version tag    |
+| `latest`  | Latest stable release (production stage) | Version tag on main           |
+| `v1.0.0`  | Pinned version (production stage)        | Version tag on main           |
+| `pr-<N>`  | PR preview image for testing             | Every push to an open PR      |
 
 ### Pulling Images
 
@@ -253,8 +253,9 @@ services:
 
 Images are automatically published to GHCR when:
 
-1. **Push to main branch**: Creates `latest` and `main` tags
-2. **Git tags**: Creates versioned tags (e.g., `v1.0.0`, `1.0`, `latest`)
+1. **Push to main branch**: Creates `:dev` tag (development target)
+2. **Version tag on main**: Creates `:v*`, `:latest` (production target), and `:dev` (development target)
+3. **Pull request**: Creates `:pr-<N>` tag (development target, deleted on PR close)
 
 ### Manual Publishing
 
@@ -270,14 +271,15 @@ docker push ghcr.io/lipkau/mealie_translate:custom
 
 ### CI/CD Integration
 
-The GitHub Actions workflow (`.github/workflows/cd.yml`) handles:
+The CD pipeline (`cd.yml` + `_docker-build.yml`) handles:
 
-- ✅ Multi-platform builds (linux/amd64 + linux/arm64)
-- ✅ Multi-stage builds (dev + production)
-- ✅ Automatic tagging strategy
-- ✅ Security scanning with Trivy
-- ✅ GHCR authentication and publishing
-- ✅ Build caching for faster deployments
+- Multi-platform builds (linux/amd64 + linux/arm64)
+- Multi-stage builds (development + production targets)
+- Automatic tagging strategy (`:dev`, `:latest`, `:v*`, `:pr-N`)
+- SLSA provenance attestation and SBOM generation
+- GHCR authentication and publishing
+- Scoped build caching per image target
+- Automatic PR image commenting and cleanup
 
 ### Supported Platforms
 

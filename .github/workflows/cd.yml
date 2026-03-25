@@ -8,94 +8,52 @@ on:
 permissions:
   contents: read
   packages: write
+  pull-requests: write
+  id-token: write
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+concurrency:
+  group: cd-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
 
 jobs:
-  build-and-push:
-    name: Build and Push Docker Images
+  gate:
+    name: Determine Build Targets
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    outputs:
+      build_dev: ${{ steps.decide.outputs.build_dev }}
+      build_prod: ${{ steps.decide.outputs.build_prod }}
+      build_pr: ${{ steps.decide.outputs.build_pr }}
+      docker_tag: ${{ steps.find_tag.outputs.tag }}
+      pr_number: ${{ steps.find_pr.outputs.result }}
     steps:
       - uses: actions/checkout@v6
+        if: ${{ github.event.workflow_run.event != 'pull_request' }}
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
           fetch-tags: true
 
-      - uses: docker/setup-qemu-action@v4
-
-      - uses: docker/setup-buildx-action@v4
-
-      - uses: docker/login-action@v4
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # Find the v* tag for this commit (if any)
       - name: Find git tag
         id: find_tag
+        if: ${{ github.event.workflow_run.event != 'pull_request' }}
         run: |
           TAG=$(git tag --points-at ${{ github.event.workflow_run.head_sha }} | grep -E '^v[0-9]' | head -n1 || true)
 
-          # Sanitize tag for Docker compatibility
           if [[ -n "$TAG" ]]; then
-            # Convert to lowercase and replace invalid characters
             DOCKER_TAG=$(echo "$TAG" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9._-]/-/g' | sed 's/^[-.]*//' | sed 's/[-._]*$//')
 
-            # Skip if sanitization resulted in empty string
             if [[ -z "$DOCKER_TAG" ]]; then
               echo "Warning: Tag '$TAG' is invalid for Docker (sanitization resulted in empty string)"
-              echo "Skipping Docker build for this tag"
               echo "tag=" >> $GITHUB_OUTPUT
             else
-              echo "Original tag: $TAG"
-              echo "Docker tag: $DOCKER_TAG"
+              echo "Original tag: $TAG → Docker tag: $DOCKER_TAG"
               echo "tag=$DOCKER_TAG" >> $GITHUB_OUTPUT
             fi
           else
             echo "tag=" >> $GITHUB_OUTPUT
           fi
 
-      # Prepare dev image tags (only for main branch pushes → :dev tag)
-      - name: Prepare dev image tags
-        id: dev_tags
-        run: |
-          if [[ "${{ github.event.workflow_run.head_branch }}" == "main" ]]; then
-            echo "Building dev image for main branch"
-            TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev"
-          else
-            echo "No dev image needed for this scenario"
-            TAGS=""
-          fi
-          echo "tags=$TAGS" >> $GITHUB_OUTPUT
-
-      # Build and push dev image (development target)
-      - name: Build and push dev image
-        if: ${{ steps.dev_tags.outputs.tags != '' }}
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          target: development
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.dev_tags.outputs.tags }}
-          annotations: |
-            index:org.opencontainers.image.title=Mealie Recipe Translator
-            index:org.opencontainers.image.description=Translates Mealie recipes using LLMs and converts imperial units to metric
-            index:org.opencontainers.image.url=https://github.com/lipkau/mealie_translate
-            index:org.opencontainers.image.source=https://github.com/lipkau/mealie_translate
-            index:org.opencontainers.image.documentation=https://github.com/lipkau/mealie_translate#readme
-            index:org.opencontainers.image.licenses=MIT
-            index:org.opencontainers.image.vendor=Oliver Lipkau
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      # Verify tagged commit is on main (tag pushes set head_branch to the
-      # tag ref, not "main", so we check with git instead of the event field)
       - name: Check if commit is on main
         id: on_main
         if: ${{ steps.find_tag.outputs.tag != '' }}
@@ -105,29 +63,95 @@ jobs:
           if git merge-base --is-ancestor "$SHA" origin/main 2>/dev/null; then
             echo "result=true" >> $GITHUB_OUTPUT
           else
-            echo "Commit $SHA is not on main — skipping production build"
+            echo "Commit $SHA is not on main — skipping release builds"
             echo "result=false" >> $GITHUB_OUTPUT
           fi
 
-      # Build and push prod image (production target) for tagged commits on main
-      - name: Build and push prod image
-        if: ${{ steps.find_tag.outputs.tag != '' && steps.on_main.outputs.result == 'true' }}
-        uses: docker/build-push-action@v7
+      - name: Find associated pull request
+        id: find_pr
+        if: ${{ github.event.workflow_run.event == 'pull_request' }}
+        uses: actions/github-script@v7
         with:
-          context: .
-          target: production
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.find_tag.outputs.tag }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          annotations: |
-            index:org.opencontainers.image.title=Mealie Recipe Translator
-            index:org.opencontainers.image.description=Translates Mealie recipes using LLMs and converts imperial units to metric
-            index:org.opencontainers.image.url=https://github.com/lipkau/mealie_translate
-            index:org.opencontainers.image.source=https://github.com/lipkau/mealie_translate
-            index:org.opencontainers.image.documentation=https://github.com/lipkau/mealie_translate#readme
-            index:org.opencontainers.image.licenses=MIT
-            index:org.opencontainers.image.vendor=Oliver Lipkau
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          script: |
+            const pulls = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.payload.workflow_run.head_sha,
+            });
+            const open = pulls.data.filter(p => p.state === 'open');
+            if (open.length > 0) {
+              console.log(`Found open PR #${open[0].number}`);
+              return open[0].number;
+            }
+            console.log('No open PR found for this commit');
+            return '';
+          result-encoding: string
+
+      - name: Decide build targets
+        id: decide
+        run: |
+          HEAD_BRANCH="${{ github.event.workflow_run.head_branch }}"
+          HAS_TAG="${{ steps.find_tag.outputs.tag }}"
+          ON_MAIN="${{ steps.on_main.outputs.result }}"
+          EVENT="${{ github.event.workflow_run.event }}"
+          PR_NUM="${{ steps.find_pr.outputs.result }}"
+
+          IS_RELEASE=$([[ -n "$HAS_TAG" && "$ON_MAIN" == "true" ]] && echo true || echo false)
+
+          # Dev image: main-branch push OR version-tag release on main
+          if [[ "$HEAD_BRANCH" == "main" || "$IS_RELEASE" == "true" ]]; then
+            echo "build_dev=true" >> $GITHUB_OUTPUT
+          else
+            echo "build_dev=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Prod image: version-tag release on main
+          echo "build_prod=$IS_RELEASE" >> $GITHUB_OUTPUT
+
+          # PR image: pull_request event with an open PR found
+          if [[ "$EVENT" == "pull_request" && -n "$PR_NUM" ]]; then
+            echo "build_pr=true" >> $GITHUB_OUTPUT
+          else
+            echo "build_pr=false" >> $GITHUB_OUTPUT
+          fi
+
+  build-dev:
+    name: Build Dev Image (:dev)
+    needs: gate
+    if: ${{ needs.gate.outputs.build_dev == 'true' }}
+    uses: ./.github/workflows/_docker-build.yml
+    secrets: inherit
+    with:
+      target: development
+      tags: ghcr.io/${{ github.repository }}:dev
+      cache_scope: dev
+
+  build-prod:
+    name: Build Production Image
+    needs: gate
+    if: ${{ needs.gate.outputs.build_prod == 'true' }}
+    uses: ./.github/workflows/_docker-build.yml
+    secrets: inherit
+    with:
+      target: production
+      tags: |-
+        ghcr.io/${{ github.repository }}:${{ needs.gate.outputs.docker_tag }}
+        ghcr.io/${{ github.repository }}:latest
+      cache_scope: prod
+
+  build-pr:
+    name: Build PR Image
+    needs: gate
+    if: ${{ needs.gate.outputs.build_pr == 'true' }}
+    uses: ./.github/workflows/_docker-build.yml
+    secrets: inherit
+    with:
+      target: development
+      tags: ghcr.io/${{ github.repository }}:pr-${{ needs.gate.outputs.pr_number }}
+      cache_scope: pr
+      pr_number: ${{ needs.gate.outputs.pr_number }}
+      annotations: |
+        index:org.opencontainers.image.title=Mealie Recipe Translator (PR)
+        index:org.opencontainers.image.description=PR preview image for testing
+        index:org.opencontainers.image.url=https://github.com/lipkau/mealie_translate
+        index:org.opencontainers.image.source=https://github.com/lipkau/mealie_translate

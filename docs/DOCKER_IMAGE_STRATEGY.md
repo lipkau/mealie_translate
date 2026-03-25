@@ -1,222 +1,166 @@
 # Docker Image Strategy
 
-This document explains when and how different Docker images are built in the Mealie Recipe Translator project.
+This document explains when and how different Docker images are built
+in the Mealie Recipe Translator project.
 
-## 🎯 Overview
+## Overview
 
-Our Docker build strategy creates two types of images based on context:
+The CD pipeline produces three categories of Docker images:
 
-- **Development Images**: For PR testing and development
-- **Production Images**: For releases and production deployment
+- **Development images** (`target: development`) -- for PR testing and the `:dev` tag
+- **Production images** (`target: production`) -- for versioned releases and `:latest`
 
-## 📦 Image Types
+The pipeline is defined across two workflow files:
 
-### Development Images (`target: development`)
+- `cd.yml` -- gate job + three caller jobs
+- `_docker-build.yml` -- reusable workflow that all build jobs share
 
-- **Purpose**: Testing, development, and feature validation
-- **Contents**: Application code + development tools and dependencies
-- **Size**: Larger (includes dev dependencies)
-- **Use Cases**: PR testing, feature branches, development environments
+## Image Tags
 
-### Production Images (`target: production`)
+| Tag       | Built from                       | Dockerfile target | Purpose                    |
+| --------- | -------------------------------- | ----------------- | -------------------------- |
+| `dev`     | push to `main` / version tag    | development       | Beta users, staging        |
+| `latest`  | version tag on `main`            | production        | Production deployments     |
+| `v1.2.3`  | version tag on `main`            | production        | Pinned production version  |
+| `pr-<N>`  | every PR (automatic)             | development       | Contributor testing        |
 
-- **Purpose**: Production deployment and stable releases
-- **Contents**: Application code only with minimal dependencies
-- **Size**: Smaller (optimized for production)
-- **Use Cases**: Official releases, production deployments
+## Build Decision Matrix
 
-## 🔄 Build Decision Matrix
+| Event                  | `:dev` | `:v*` + `:latest` | `:pr-N` | Total builds |
+| ---------------------- | ------ | ------------------ | ------- | ------------ |
+| Push to `main`         | yes    | --                 | --      | 1            |
+| Version tag on `main`  | yes    | yes                | --      | 2 (parallel) |
+| Pull request           | --     | --                 | yes     | 1            |
+| Tag not on `main`      | --     | --                 | --      | 0            |
 
-| Scenario             | Branch | Tag Present | Image Built | Target      | Example Tag                                       |
-| -------------------- | ------ | ----------- | ----------- | ----------- | ------------------------------------------------- |
-| Development workflow | main   | ❌           | ❌           | -           | -                                                 |
-| Feature testing      | PR     | ✅           | ✅           | development | `ghcr.io/lipkau/mealie_translate:pr-123-test-dev` |
-| Production release   | main   | ✅           | ✅           | production  | `ghcr.io/lipkau/mealie_translate:v1.2.3`          |
-| Regular PR           | PR     | ❌           | ❌           | -           | -                                                 |
+## Pipeline Architecture
 
-## 📋 Build Scenarios
-
-### 1. **Development Workflow** (Main Branch)
-
-```bash
-git push origin main  # No tag
+```mermaid
+flowchart TD
+  CI[CI completes] --> gate[gate job]
+  gate -->|"build_dev=true"| buildDev["build-dev (:dev)"]
+  gate -->|"build_prod=true"| buildProd["build-prod (:v* + :latest)"]
+  gate -->|"build_pr=true"| buildPr["build-pr (:pr-N + comment)"]
+  buildPr --> comment["Comment on PR"]
+  prClose["PR closed"] --> cleanup["pr-image-cleanup.yml"]
 ```
 
-**Result**: No image built (CI runs, no CD)
+The `gate` job is lightweight (no Docker setup).
+It determines which downstream build jobs to run and passes outputs
+(tag name, PR number) to them.
 
-**Use Cases**: Regular development, no deployment needed
+All three build jobs call the same reusable workflow
+(`_docker-build.yml`), which handles checkout, QEMU, buildx, login,
+build-push, provenance, SBOM, and optional PR commenting.
 
-### 2. **Feature Testing** (PR with Tag)
+For version-tag releases, `build-dev` and `build-prod` run
+**in parallel** on separate runners.
 
-```bash
-git tag pr-123-test
-git push origin tag pr-123-test
-```
+## Build Scenarios
 
-**Result**: `ghcr.io/lipkau/mealie_translate:pr-123-test-dev` (development image)
-
-**Use Cases**:
-
-- PR reviewers can test specific features
-- Integration testing with external services
-- Feature validation before merge
-
-### 3. **Production Release** (Main Branch + Tag)
+### 1. Push to `main` (merge)
 
 ```bash
-git tag v1.2.3
-git push origin tag v1.2.3
+git push origin main
 ```
+
+**Result**: `:dev` image built (development target, multi-arch).
+
+### 2. Version tag on `main` (release)
+
+```bash
+git tag -a v1.2.3 -m "Release v1.2.3"
+git push origin v1.2.3
+```
+
+**Result** (parallel):
+
+- `ghcr.io/lipkau/mealie_translate:v1.2.3` + `:latest` (production target)
+- `ghcr.io/lipkau/mealie_translate:dev` (development target)
+
+### 3. Pull request (automatic)
+
+Open or push to a PR targeting `main`.
+No manual tagging required.
 
 **Result**:
 
-- `ghcr.io/lipkau/mealie_translate:v1.2.3` (production image)
-- `ghcr.io/lipkau/mealie_translate:latest` (production image)
+- `ghcr.io/lipkau/mealie_translate:pr-<N>` (development target, multi-arch)
+- Bot comments the `docker pull` command on the PR
+- Image is updated on every subsequent push to the PR
 
-**Use Cases**:
+### 4. Tag not on `main`
 
-- Official releases
-- Production deployments
-- Stable version distribution
+A `v*` tag pushed to a commit that is not on `main` produces no images.
+The gate job's `on_main` check rejects it.
 
-### 4. **PR Without Tag** (Feature Branch)
+## PR Image Lifecycle
+
+1. PR opened or pushed -- CI runs, CD builds `:pr-<N>`, bot comments on the PR.
+2. Subsequent pushes -- image is rebuilt, comment is updated (not duplicated).
+3. PR closed (merged or not) -- `pr-image-cleanup.yml` deletes the `:pr-<N>`
+   package version from GHCR.
+
+## Supply-Chain Attestation
+
+All images are built with:
+
+- **SLSA provenance** (`provenance: mode=max`) -- records builder, source, and
+  build instructions.
+- **SBOM** (`sbom: true`) -- generates a Software Bill of Materials via Syft.
+
+Inspect with:
 
 ```bash
-git push origin feature-branch  # No tag
+docker buildx imagetools inspect ghcr.io/lipkau/mealie_translate:latest
 ```
 
-**Result**: No image built (CI only)
+## Cache Strategy
 
-**Use Cases**: Regular development PRs that don't need testing
+Each build job uses a separate GHA cache scope to prevent eviction across targets:
 
-## 🏷️ Tagging Rules
+| Job          | Scope  |
+| ------------ | ------ |
+| `build-dev`  | `dev`  |
+| `build-prod` | `prod` |
+| `build-pr`   | `pr`   |
 
-### Git Tag Requirements
+## Concurrency
 
-- **Format**: `v{major}.{minor}.{patch}[-suffix]`
-- **Valid Examples**: `v1.0.0`, `v2.1.3-beta`, `pr-123-test`
-- **Invalid Examples**: `1.0.0` (no v), `release-candidate` (no version)
-
-### Docker Tag Sanitization
-
-Git tags are automatically sanitized for Docker compatibility:
-
-- Replace `/` with `-` (e.g., `feature/auth` → `feature-auth`)
-- Replace `+` with `-` (e.g., `v1.0.0+build` → `v1.0.0-build`)
-- Skip tags with spaces or invalid characters
-
-## 🔧 Implementation Details
-
-### Dockerfile Targets
-
-```dockerfile
-# Development target (includes dev dependencies)
-FROM python:3.14-slim-trixie as development
-RUN pip install --no-cache-dir -e .[dev]
-
-# Production target (minimal dependencies)
-FROM python:3.14-slim-trixie as production
-RUN pip install --no-cache-dir .
-```
-
-### GitHub Actions Logic
+The CD workflow uses a concurrency group keyed on the triggering branch:
 
 ```yaml
-# Determine image type based on branch and tag
-image_type: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
-
-# Build with appropriate target
-docker build --target ${{ steps.determine.outputs.image_type }}
+concurrency:
+  group: cd-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
 ```
 
-## 🚀 Usage Examples
+Rapid pushes to the same branch cancel in-flight CD runs.
+Different version tags each get their own group and never cancel each other.
 
-### Testing a Feature Branch
+## Troubleshooting
 
-```bash
-# Developer creates feature and tags for testing
-git checkout feature-new-translator
-git tag pr-456-translator-test
-git push origin tag pr-456-translator-test
+### Image not built
 
-# Image built: ghcr.io/lipkau/mealie_translate:pr-456-translator-test-dev
-# Reviewers can test: docker run ghcr.io/lipkau/mealie_translate:pr-456-translator-test-dev
-```
+1. Check that CI completed successfully (CD only runs on CI success).
+2. For production images, verify the tag follows the `v*` pattern and the
+   tagged commit is on `main`.
+3. Check the `gate` job logs for the `Decide build targets` step output.
 
-### Creating a Release
+### PR image not appearing
 
-```bash
-# Maintainer creates production release
-git checkout main
-git tag v2.0.0
-git push origin tag v2.0.0
+1. Confirm CI passed for the PR.
+2. Check the `gate` job's `Find associated pull request` step -- the PR must
+   be open at the time CD runs.
 
-# Images built:
-#   - ghcr.io/lipkau/mealie_translate:v2.0.0
-#   - ghcr.io/lipkau/mealie_translate:latest
-```
+### Wrong image type
 
-## 🛠️ Troubleshooting
+Production images use the `production` Dockerfile target.
+Development and PR images use the `development` target.
+If the image has dev dependencies, it was built from the `development` target.
 
-### Image Not Built
+## Related Documentation
 
-**Problem**: Tagged commit but no image appeared
-
-**Solutions**:
-
-1. Check if tag follows `v*` pattern for production images
-2. Verify CI completed successfully before CD runs
-3. Check GitHub Actions logs for build failures
-4. Ensure tag was pushed: `git push origin tag <tagname>`
-
-### Wrong Image Type
-
-**Problem**: Expected production image but got development
-
-**Solutions**:
-
-1. Verify tag was pushed to `main` branch, not feature branch
-2. Check if commit exists on main: `git branch --contains <tag>`
-3. Re-tag on correct branch if needed
-
-### Tag Sanitization Issues
-
-**Problem**: Git tag contains invalid Docker characters
-
-**Solutions**:
-
-1. Use alphanumeric characters, hyphens, and underscores only
-2. Avoid spaces, slashes (except in branch names), and special characters
-3. Check CD workflow logs for sanitization details
-
-## 🧹 Image Maintenance
-
-### Automated Cleanup
-
-Development images are automatically cleaned up to prevent registry bloat:
-
-- **Schedule**: Daily at 2 AM UTC via dedicated maintenance pipeline
-- **Retention**: Development images older than 7 days are automatically removed
-- **Scope**: Only affects development images (tags matching `dev` or `pr-*-dev`)
-- **Production Images**: Never automatically deleted (manual cleanup only)
-
-### Manual Cleanup
-
-To manually trigger image cleanup:
-
-```bash
-# Trigger the maintenance workflow manually
-gh workflow run maintenance.yml
-```
-
-### Monitoring Cleanup
-
-- Check the maintenance pipeline runs in GitHub Actions
-- Review cleanup summaries in workflow step summaries
-- Failed deletions are logged but don't stop the pipeline
-
-## 📚 Related Documentation
-
-- [CI/CD Architecture](CI_CD_ARCHITECTURE.md): Complete pipeline overview
-- [Development Guide](DEVELOPMENT.md): Local development setup
-- [Docker Documentation](DOCKER.md): Container usage and deployment
+- [CI/CD Architecture](CI_CD_ARCHITECTURE.md) -- full pipeline overview
+- [Docker Guide](DOCKER.md) -- container usage and deployment
+- [Development Guide](DEVELOPMENT.md) -- local development setup

@@ -1,0 +1,69 @@
+name: PR Image Cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  packages: write
+
+jobs:
+  delete-pr-image:
+    name: Delete PR Docker Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete PR image from GHCR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const packageName = context.repo.repo;
+            const tag = `pr-${context.payload.pull_request.number}`;
+
+            async function getVersions() {
+              try {
+                return await github.rest.packages.getAllPackageVersionsForPackageOwnedByUser({
+                  package_type: 'container',
+                  package_name: packageName,
+                  username: owner,
+                  per_page: 100,
+                });
+              } catch {
+                return await github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg({
+                  package_type: 'container',
+                  package_name: packageName,
+                  org: owner,
+                  per_page: 100,
+                });
+              }
+            }
+
+            async function deleteVersion(versionId) {
+              try {
+                await github.rest.packages.deletePackageVersionForUser({
+                  package_type: 'container',
+                  package_name: packageName,
+                  username: owner,
+                  package_version_id: versionId,
+                });
+              } catch {
+                await github.rest.packages.deletePackageVersionForOrg({
+                  package_type: 'container',
+                  package_name: packageName,
+                  org: owner,
+                  package_version_id: versionId,
+                });
+              }
+            }
+
+            const { data: versions } = await getVersions();
+            const match = versions.find(v =>
+              v.metadata?.container?.tags?.includes(tag)
+            );
+
+            if (match) {
+              await deleteVersion(match.id);
+              console.log(`Deleted ${packageName}:${tag} (version ${match.id})`);
+            } else {
+              console.log(`No image found with tag ${tag} — nothing to clean up`);
+            }
