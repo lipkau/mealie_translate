@@ -116,7 +116,7 @@ help:
 	@echo "  lint-all             Run all linting and formatting checks"
 	@echo "  lint-no-markdown     Run linting without markdown (for CI)"
 	@echo "  format               Format code with ruff"
-	@echo "  check                Complete dev workflow: format + lint-all + test (⭐ shorthand)"
+	@echo "  check                Test local changes: lint-all + test (⭐ shorthand)"
 	@echo ""
 	@echo "CI Targets (use system Python, minimal output):"
 	@echo "  ci-lint              Run linting for CI (no venv, includes pyright)"
@@ -340,7 +340,7 @@ format: .ensure-ruff
 	$(PYTHON) -m ruff check --fix $(SOURCES)
 	$(PYTHON) -m ruff format $(SOURCES)
 
-check: format lint-all test
+check: lint-all test
 
 # -----------------------------------------------------------------------------
 # CI Linting (system Python, no venv dependency checks)

@@ -19,20 +19,22 @@ from typing import Any
 project_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(project_dir))
 
-from _model_comparison_data import (
-    AVAILABLE_MODELS,
-    CATEGORY_TEST_CASES,
-    TAG_TEST_CASES,
-    UNIT_TEST_CASES,
-)
-
-from mealie_translate.config import get_settings
+from mealie_translate.config import Settings, get_settings
 from mealie_translate.organizer import (
     ALLOWED_CATEGORIES,
     CATEGORY_GENERATION_PROMPT,
     TAG_GENERATION_PROMPT,
 )
 from mealie_translate.translator import RecipeTranslator
+from tools._model_comparison_data import (
+    AVAILABLE_MODELS,
+    CATEGORY_TEST_CASES,
+    TAG_TEST_CASES,
+    UNIT_TEST_CASES,
+    CategoryTestCase,
+    TagTestCase,
+    UnitTestCase,
+)
 
 
 async def _run_unit_tests(
@@ -41,15 +43,20 @@ async def _run_unit_tests(
     """Run unit conversion tests and return per-test results."""
     results = []
     for i, tc in enumerate(UNIT_TEST_CASES, 1):
-        print(f"\n  [{i}/{len(UNIT_TEST_CASES)}] {tc['name']}")
-        print(f"   Input:    {tc['input']}")
-        print(f"   Expected: {tc['expected_output']}")
+        case: UnitTestCase = tc
+        print(f"\n  [{i}/{len(UNIT_TEST_CASES)}] {case['name']}")
+        print(f"   Input:    {case['input']}")
+        print(f"   Expected: {case['expected_output']}")
         start = time.time()
         try:
-            output = await translator.translate_text_with_model(tc["input"], model_name)
+            output = await translator.translate_text_with_model(
+                case["input"], model_name
+            )
             elapsed = time.time() - start
-            found = [e for e in tc["key_elements"] if e.lower() in output.lower()]
-            missing = [e for e in tc["key_elements"] if e.lower() not in output.lower()]
+            found = [e for e in case["key_elements"] if e.lower() in output.lower()]
+            missing = [
+                e for e in case["key_elements"] if e.lower() not in output.lower()
+            ]
             if not missing:
                 status = "✅ PASSED"
             elif len(found) > len(missing):
@@ -63,8 +70,8 @@ async def _run_unit_tests(
             results.append(
                 {
                     "name": tc["name"],
-                    "input": tc["input"],
-                    "expected": tc["expected_output"],
+                    "input": case["input"],
+                    "expected": case["expected_output"],
                     "output": output,
                     "found": found,
                     "missing": missing,
@@ -79,11 +86,11 @@ async def _run_unit_tests(
             results.append(
                 {
                     "name": tc["name"],
-                    "input": tc["input"],
-                    "expected": tc["expected_output"],
+                    "input": case["input"],
+                    "expected": case["expected_output"],
                     "output": f"ERROR: {e}",
                     "found": [],
-                    "missing": tc["key_elements"],
+                    "missing": case["key_elements"],
                     "status": "❌ ERROR",
                     "time": elapsed,
                 }
@@ -97,17 +104,20 @@ async def _run_tag_tests(
     """Run tagging tests and return per-test results."""
     results = []
     for i, tc in enumerate(TAG_TEST_CASES, 1):
-        print(f"\n  [{i}/{len(TAG_TEST_CASES)}] {tc['name']}")
-        prompt = TAG_GENERATION_PROMPT.format(**tc["recipe"])
+        case: TagTestCase = tc
+        print(f"\n  [{i}/{len(TAG_TEST_CASES)}] {case['name']}")
+        prompt = TAG_GENERATION_PROMPT.format(**case["recipe"])
         start = time.time()
         try:
             output = await translator._call_openai(prompt, model_name)
             elapsed = time.time() - start
             tags_raw = [t.strip().lower() for t in output.split(",") if t.strip()]
             missing_expected = [
-                t for t in tc["expected_tags"] if not any(t in tag for tag in tags_raw)
+                t
+                for t in case["expected_tags"]
+                if not any(t in tag for tag in tags_raw)
             ]
-            violations = [w for w in tc["forbidden"] if w in tags_raw]
+            violations = [w for w in case["forbidden"] if w in tags_raw]
             if not missing_expected and not violations:
                 status = "✅ PASSED"
             elif not violations:
@@ -124,7 +134,7 @@ async def _run_tag_tests(
                 )
             results.append(
                 {
-                    "name": tc["name"],
+                    "name": case["name"],
                     "output": output,
                     "tags": tags_raw,
                     "missing_expected": missing_expected,
@@ -139,10 +149,10 @@ async def _run_tag_tests(
             print(f"   Status:   ❌ ERROR  ({elapsed:.2f}s)")
             results.append(
                 {
-                    "name": tc["name"],
+                    "name": case["name"],
                     "output": f"ERROR: {e}",
                     "tags": [],
-                    "missing_expected": tc["expected_tags"],
+                    "missing_expected": case["expected_tags"],
                     "violations": [],
                     "status": "❌ ERROR",
                     "time": elapsed,
@@ -157,8 +167,9 @@ async def _run_category_tests(
     """Run categorisation tests and return per-test results."""
     results = []
     for i, tc in enumerate(CATEGORY_TEST_CASES, 1):
-        print(f"\n  [{i}/{len(CATEGORY_TEST_CASES)}] {tc['name']}")
-        prompt = CATEGORY_GENERATION_PROMPT.format(**tc["recipe"])
+        case: CategoryTestCase = tc
+        print(f"\n  [{i}/{len(CATEGORY_TEST_CASES)}] {case['name']}")
+        prompt = CATEGORY_GENERATION_PROMPT.format(**case["recipe"])
         start = time.time()
         try:
             output = await translator._call_openai(prompt, model_name)
@@ -166,9 +177,9 @@ async def _run_category_tests(
             cats_raw = [c.strip().lower() for c in output.split(",") if c.strip()]
             vocab_violations = [c for c in cats_raw if c not in ALLOWED_CATEGORIES]
             missing_expected = [
-                c for c in tc["expected_categories"] if c not in cats_raw
+                c for c in case["expected_categories"] if c not in cats_raw
             ]
-            wrong_assigned = [c for c in tc["must_not_include"] if c in cats_raw]
+            wrong_assigned = [c for c in case["must_not_include"] if c in cats_raw]
             if not vocab_violations and not missing_expected and not wrong_assigned:
                 status = "✅ PASSED"
             elif not vocab_violations and not wrong_assigned:
@@ -187,7 +198,7 @@ async def _run_category_tests(
                 print(f"   Wrong cats:   {wrong_assigned}")
             results.append(
                 {
-                    "name": tc["name"],
+                    "name": case["name"],
                     "output": output,
                     "categories": cats_raw,
                     "missing_expected": missing_expected,
@@ -203,10 +214,10 @@ async def _run_category_tests(
             print(f"   Status:   ❌ ERROR  ({elapsed:.2f}s)")
             results.append(
                 {
-                    "name": tc["name"],
+                    "name": case["name"],
                     "output": f"ERROR: {e}",
                     "categories": [],
-                    "missing_expected": tc["expected_categories"],
+                    "missing_expected": case["expected_categories"],
                     "vocab_violations": [],
                     "wrong_assigned": [],
                     "status": "❌ ERROR",
@@ -216,13 +227,14 @@ async def _run_category_tests(
     return results
 
 
-def _count_statuses(tests: list[dict]) -> tuple[int, int, int]:
+def _count_statuses(tests: list[dict[str, Any]]) -> tuple[int, int, int]:
+    """Count passed, partial, and failed results for a test group."""
     passed = sum(1 for t in tests if t["status"] == "✅ PASSED")
     partial = sum(1 for t in tests if "PARTIAL" in t["status"])
     return passed, partial, len(tests) - passed - partial
 
 
-async def test_single_model(model_name: str, settings) -> dict[str, Any]:
+async def test_single_model(model_name: str, settings: Settings) -> dict[str, Any]:
     """Test a single model across unit conversion, tagging, and categorisation."""
     print(f"\n{'=' * 60}")
     print(f"🔬 Testing {model_name}")
