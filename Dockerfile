@@ -4,7 +4,7 @@ FROM python:3.14-slim-trixie AS base
 
 # Add image labels for metadata
 LABEL org.opencontainers.image.title="Mealie Recipe Translator"
-LABEL org.opencontainers.image.description="A Python application that translates Mealie recipes using OpenAI's ChatGPT API"
+LABEL org.opencontainers.image.description="Translates Mealie recipes using LLMs and converts imperial units to metric"
 LABEL org.opencontainers.image.vendor="Oliver Lipkau"
 LABEL org.opencontainers.image.licenses="MIT"
 LABEL org.opencontainers.image.url="https://github.com/lipkau/mealie_translate"

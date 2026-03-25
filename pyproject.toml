@@ -8,7 +8,7 @@ version = "1.0.0"
 authors = [
     {name = "Oliver Lipkau", email = "oliver@lipkau.net"},
 ]
-description = "A Python application that translates Mealie recipes using OpenAI's ChatGPT API"
+description = "Translates Mealie recipes using LLMs and converts imperial units to metric"
 readme = "README.md"
 license = {text = "MIT"}
 keywords = ["mealie", "recipe", "translation", "openai", "chatgpt"]

@@ -3,5 +3,5 @@
 __version__ = "1.0.0"
 __author__ = "Oliver Lipkau"
 __description__ = (
-    "A Python application that translates Mealie recipes using OpenAI's ChatGPT API"
+    "Translates Mealie recipes using LLMs and converts imperial units to metric"
 )
