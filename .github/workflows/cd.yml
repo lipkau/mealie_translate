@@ -60,18 +60,15 @@ jobs:
             echo "tag=" >> $GITHUB_OUTPUT
           fi
 
-      # Prepare dev image tags
+      # Prepare dev image tags (only for main branch pushes → :dev tag)
       - name: Prepare dev image tags
         id: dev_tags
         run: |
           if [[ "${{ github.event.workflow_run.head_branch }}" == "main" ]]; then
             echo "Building dev image for main branch"
             TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev"
-          elif [[ "${{ steps.find_tag.outputs.tag }}" != "" ]]; then
-            echo "Building dev image for PR tag: ${{ steps.find_tag.outputs.tag }}"
-            TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.find_tag.outputs.tag }}"
           else
-          echo "No dev image needed for this scenario"
+            echo "No dev image needed for this scenario"
             TAGS=""
           fi
           echo "tags=$TAGS" >> $GITHUB_OUTPUT
@@ -89,9 +86,24 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Build and push prod image (production target) for main branch tags only
+      # Verify tagged commit is on main (tag pushes set head_branch to the
+      # tag ref, not "main", so we check with git instead of the event field)
+      - name: Check if commit is on main
+        id: on_main
+        if: ${{ steps.find_tag.outputs.tag != '' }}
+        run: |
+          git fetch origin main --quiet
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          if git merge-base --is-ancestor "$SHA" origin/main 2>/dev/null; then
+            echo "result=true" >> $GITHUB_OUTPUT
+          else
+            echo "Commit $SHA is not on main — skipping production build"
+            echo "result=false" >> $GITHUB_OUTPUT
+          fi
+
+      # Build and push prod image (production target) for tagged commits on main
       - name: Build and push prod image
-        if: ${{ steps.find_tag.outputs.tag != '' && github.event.workflow_run.head_branch == 'main' }}
+        if: ${{ steps.find_tag.outputs.tag != '' && steps.on_main.outputs.result == 'true' }}
         uses: docker/build-push-action@v7
         with:
           context: .
