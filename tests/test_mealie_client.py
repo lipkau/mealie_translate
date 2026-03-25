@@ -24,6 +24,7 @@ def test_mealie_client_initialization(mock_settings):
 
     assert client.base_url == "https://test.mealie.com"
     assert client.api_token == "test_token"
+    assert client.processed_tag == "translated"
 
 
 async def test_mealie_client_context_manager(mock_settings):
@@ -130,6 +131,26 @@ async def test_mark_recipe_as_processed_success(mock_settings):
 
     assert result is True
     assert put_route.called
+
+
+def test_is_recipe_processed_uses_configured_marker(mock_settings):
+    """Test recipe processed status respects the configured marker key."""
+    custom_settings = mock_settings.model_copy(update={"processed_tag": "done_flag"})
+    client = MealieClient(custom_settings)
+
+    assert client.is_recipe_processed({"extras": {"done_flag": "true"}}) is True
+    assert client.is_recipe_processed({"extras": {"translated": "true"}}) is False
+
+
+def test_set_recipe_processed_marker_uses_configured_marker(mock_settings):
+    """Test processed-marker helper uses the configured extras key."""
+    custom_settings = mock_settings.model_copy(update={"processed_tag": "done_flag"})
+    client = MealieClient(custom_settings)
+    recipe = {"name": "Test Recipe", "extras": {}}
+
+    client.set_recipe_processed_marker(recipe)
+
+    assert recipe["extras"] == {"done_flag": "true"}
 
 
 @respx.mock

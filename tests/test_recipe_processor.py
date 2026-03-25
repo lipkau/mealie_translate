@@ -133,6 +133,53 @@ async def test_process_single_recipe_success(processor):
     processor.mealie_client.update_recipe.assert_called_once()
 
 
+async def test_process_single_recipe_uses_configured_processed_marker(mock_settings):
+    """Test successful processing uses the configured extras marker key."""
+    custom_settings = mock_settings.model_copy(update={"processed_tag": "done_flag"})
+
+    with (
+        patch("mealie_translate.recipe_processor.MealieClient") as mock_client_class,
+        patch(
+            "mealie_translate.recipe_processor.RecipeTranslator"
+        ) as mock_translator_class,
+    ):
+        mock_client = MagicMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+        mock_client.is_recipe_processed = MagicMock(return_value=False)
+        mock_client.get_recipe_details = AsyncMock(
+            return_value={"slug": "test-recipe", "name": "Test Recipe", "extras": {}}
+        )
+        mock_client.update_recipe = AsyncMock(return_value=True)
+        mock_client.set_recipe_processed_marker = MagicMock(
+            side_effect=lambda recipe: recipe.setdefault("extras", {}).update(
+                {"done_flag": "true"}
+            )
+        )
+        mock_client_class.return_value = mock_client
+
+        mock_translator = MagicMock()
+        mock_translator.translate_recipe = AsyncMock(
+            return_value={
+                "slug": "test-recipe",
+                "name": "Translated Recipe",
+                "extras": {},
+            }
+        )
+        mock_translator_class.return_value = mock_translator
+
+        processor = RecipeProcessor(custom_settings)
+        processor.mealie_client = mock_client
+        processor.translator = mock_translator
+
+        result = await processor.process_single_recipe("test-recipe")
+
+        assert result is True
+        mock_client.set_recipe_processed_marker.assert_called_once()
+        updated_recipe = mock_client.update_recipe.await_args.args[1]
+        assert updated_recipe["extras"] == {"done_flag": "true"}
+
+
 # --- Dry Run Tests ---
 
 

@@ -20,6 +20,7 @@ class MealieClient:
         """
         self.base_url = settings.mealie_base_url
         self.api_token = settings.mealie_api_token
+        self.processed_tag = settings.processed_tag
         self.max_retries = settings.max_retries
         self.retry_delay = settings.retry_delay
         self._client: httpx.AsyncClient | None = None
@@ -235,7 +236,7 @@ class MealieClient:
             raise
 
     async def mark_recipe_as_processed(self, recipe_slug: str) -> bool:
-        """Mark a recipe as processed by setting extras.translated = "true".
+        """Mark a recipe as processed by setting the configured extras marker.
 
         Args:
             recipe_slug: The recipe slug/identifier
@@ -251,9 +252,7 @@ class MealieClient:
             if self.is_recipe_processed(recipe):
                 return True
 
-            if "extras" not in recipe:
-                recipe["extras"] = {}
-            recipe["extras"]["translated"] = "true"
+            self.set_recipe_processed_marker(recipe)
 
             return await self.update_recipe(recipe_slug, recipe)
 
@@ -271,5 +270,10 @@ class MealieClient:
             True if recipe has been processed, False otherwise
         """
         extras = recipe.get("extras", {})
-        translated_value = extras.get("translated", "")
-        return translated_value.lower() in ["true", "1"]
+        processed_value = extras.get(self.processed_tag, "")
+        return str(processed_value).lower() in ["true", "1"]
+
+    def set_recipe_processed_marker(self, recipe: dict[str, Any]) -> None:
+        """Set the configured processed-marker flag on a recipe payload."""
+        extras = recipe.setdefault("extras", {})
+        extras[self.processed_tag] = "true"

@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     # Translation Configuration
     target_language: str = "English"
     processed_tag: str = "translated"
+    organised_tag: str = "organised"
 
     # Processing Configuration
     batch_size: int = 10
