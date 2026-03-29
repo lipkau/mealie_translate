@@ -1,13 +1,13 @@
 ---
 name: deployment
-description: Step-by-step workflow for deploying this project. USE FOR: creating a new release; drafting release notes; classifying semver (patch, minor, major); publishing a version tag or GitHub Release; understanding the CI → CD → staging → production pipeline; knowing what triggers Docker image builds; checking deployment status. DO NOT USE FOR: general coding; writing tests; local development setup.
+description: Step-by-step workflow for deploying this project. Use when creating a new release; drafting release notes; classifying semver (patch, minor, major); publishing a version tag or GitHub Release; understanding the CI/CD pipeline; knowing what triggers Docker image builds; or checking deployment status. Do not use for general coding, writing tests, or local development setup.
 ---
 
 # Deployment Workflow
 
 This project uses a 3-pipeline architecture: **CI → CD → Security**.
 Production deployments are triggered exclusively by version tags.
-See [`docs/CI_CD_ARCHITECTURE.md`](../../../docs/CI_CD_ARCHITECTURE.md) for the full architecture reference.
+See `docs/CI_CD_ARCHITECTURE.md` for the full architecture reference.
 
 ## Environments
 
@@ -46,13 +46,20 @@ Do this immediately before tagging so the commit range and CI status are current
    `PREV=$(git describe --tags --abbrev=0 2>/dev/null)`
    If that is wrong or missing, set `PREV` to the explicit tag or commit users last received.
 2. **Commits in range** — `git log "$PREV"..HEAD --oneline` (optionally group by conventional-commit type).
-3. **User-facing vs internal** — Highlight changes that affect operators or recipe behavior: CLI flags, Docker image behavior, env config in `mealie_translate/`, translation or organizer output. Treat dev-only paths (for example `tools/` scripts) as internal unless documentation promises them to end users.
+3. **User-facing vs internal** — Highlight changes that affect operators or recipe
+   behavior: CLI flags, Docker image behavior, env config in `mealie_translate/`,
+   translation or organizer output. Treat dev-only paths (for example `tools/`
+   scripts) as internal unless documentation promises them to end users.
 4. **Semver** — Choose the next version with [Semantic Versioning](https://semver.org/):
    - `PATCH` (`v1.0.1`): bug fixes, no breaking changes
    - `MINOR` (`v1.1.0`): new features, backwards-compatible
    - `MAJOR` (`v2.0.0`): breaking changes for consumers of the app or image
-   If something looks removed but only non-shipped code changed (for example model lists inside `tools/`, not runtime settings), say why it stays PATCH or MINOR.
-5. **Draft GitHub release notes** — Structure the draft for humans, for example: **What's New**, **Bug Fixes**, **Infrastructure**, **Documentation**. Use a short **bold** lead-in per item; add `(#123)` when the PR number is known.
+   If something looks removed but only non-shipped code changed (for example
+   model lists inside `tools/`, not runtime settings), say why it stays
+   PATCH or MINOR.
+5. **Draft GitHub release notes** — Structure the draft for humans, for example:
+   **What's New**, **Bug Fixes**, **Infrastructure**, **Documentation**. Use a
+   short **bold** lead-in per item; add `(#123)` when the PR number is known.
 6. **Full changelog link** — After you know `PREV` and the new tag `NEW_TAG`:
    `https://github.com/lipkau/mealie_translate/compare/${PREV}...${NEW_TAG}`
    Adjust owner/repo if the remote differs.
@@ -82,7 +89,8 @@ gh release create v1.2.3 \
 EOF
 ```
 
-Replace `PREV_TAG` with the real previous tag. You can use `--generate-notes` for a skeleton, then edit in the UI if you prefer.
+Replace `PREV_TAG` with the real previous tag. You can use
+`--generate-notes` for a skeleton, then edit in the UI if you prefer.
 
 ### 5. What happens automatically
 
@@ -93,11 +101,9 @@ Replace `PREV_TAG` with the real previous tag. You can use `--generate-notes` fo
 ### 6. Monitor the release
 
 ```bash
-# Check workflow runs
-# https://github.com/lipkau/mealie_translate/actions
+# Workflow runs: https://github.com/lipkau/mealie_translate/actions
 
-# Check published images
-# https://github.com/lipkau/mealie_translate/pkgs/container/mealie_translate
+# Published images: https://github.com/lipkau/mealie_translate/pkgs/container/mealie_translate
 ```
 
 ## Staging Deployment (automatic)

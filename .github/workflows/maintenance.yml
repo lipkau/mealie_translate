@@ -28,7 +28,7 @@ env:
 
 jobs:
   cleanup-old-images:
-    name: Cleanup Old Development Images
+    name: Cleanup Old Ephemeral Images
     runs-on: ubuntu-latest
     steps:
       - uses: docker/login-action@v4
@@ -40,7 +40,7 @@ jobs:
       # Delete dev images older than 7 days (keep recent ones for debugging)
       - name: Delete old dev images
         run: |
-          echo "🧹 Starting scheduled cleanup of old development images..."
+          echo "🧹 Starting scheduled cleanup of old ephemeral images..."
 
           # Extract repository name from full repository path
           REPO_NAME="${{ github.event.repository.name }}"
@@ -76,11 +76,11 @@ jobs:
             exit 0
           fi
 
-          # Filter for development images
-          PACKAGES=$(echo "$PACKAGES_JSON" | jq -c '.[] | select(.metadata.container.tags[]? | test("^(dev|pr-.*-dev)$")) | {id: .id, tags: .metadata.container.tags, created: .created_at}')
+          # Filter for ephemeral images (dev and PR tags)
+          PACKAGES=$(echo "$PACKAGES_JSON" | jq -c '.[] | select(.metadata.container.tags[]? | test("^(dev|pr-.*)$")) | {id: .id, tags: .metadata.container.tags, created: .created_at}')
 
           if [[ -z "$PACKAGES" ]]; then
-            echo "ℹ️  No development images found"
+            echo "ℹ️  No ephemeral images found"
             exit 0
           fi
 
@@ -88,16 +88,16 @@ jobs:
           CUTOFF_DATE=$(date -d '7 days ago' -u +%Y-%m-%dT%H:%M:%SZ)
 
           echo "Cutoff date: $CUTOFF_DATE"
-          echo "Found development images:"
+          echo "Found ephemeral images:"
           echo "$PACKAGES" | jq -r '. | "ID: \(.id), Tags: \(.tags | join(", ")), Created: \(.created)"'
 
           # Delete images older than cutoff
           OLD_IMAGES=$(echo "$PACKAGES" | jq -r --arg cutoff "$CUTOFF_DATE" 'select(.created < $cutoff) | .id')
 
           if [[ -z "$OLD_IMAGES" ]]; then
-            echo "✅ No old development images found to delete"
+            echo "✅ No old ephemeral images found to delete"
           else
-            echo "🗑️  Deleting old development images:"
+            echo "🗑️  Deleting old ephemeral images:"
             DELETED_COUNT=0
             for IMAGE_ID in $OLD_IMAGES; do
               echo "Deleting image ID: $IMAGE_ID"

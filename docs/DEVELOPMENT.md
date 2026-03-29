@@ -84,7 +84,6 @@ The project uses Make for all development tasks. Run `make help` for the latest 
 | ------------------- | --------------------------- | ------------------------- |
 | `make docker-build` | Build Docker image          | Local Docker testing      |
 | `make docker-run`   | Run with cron scheduling    | Production simulation     |
-| `make docker-dev`   | Run development environment | Containerized development |
 | `make docker-logs`  | Follow container logs       | Debugging                 |
 | `make docker-test`  | Run tests in Docker         | Environment testing       |
 | `make docker-clean` | Clean Docker artifacts      | Cleanup                   |

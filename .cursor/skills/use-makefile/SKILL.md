@@ -1,7 +1,6 @@
 ---
 name: use-makefile
-description: Guidance on using the project Makefile as the primary development interface. USE FOR: running tests, linting, formatting, security scans, or Docker commands; understanding which make target to use for a task; replacing raw commands with their make equivalents. DO NOT USE FOR: understanding the deployment pipeline; adding dependencies; writing documentation.
-argument-hint: "[task you want to accomplish]"
+description: Guidance on using the project Makefile as the primary development interface. Use when running tests, linting, formatting, security scans, or Docker commands, understanding which make target to use for a task, or replacing raw commands with their make equivalents. Do not use for understanding the deployment pipeline, adding dependencies, or writing documentation.
 ---
 
 # Using the Makefile
@@ -78,5 +77,7 @@ make clean-all      # Deep clean including the virtual environment
 
 ## When a `make` target does not exist
 
-If no target exists for what you need, run the raw command from within the activated virtual environment (see the `python-venv` skill).
-Do **not** add a new target to the Makefile without checking that it does not duplicate an existing one.
+If no target exists for what you need, run the raw command from within
+the activated virtual environment (see the `python-venv` skill).
+Do **not** add a new target to the Makefile without checking that it
+does not duplicate an existing one.

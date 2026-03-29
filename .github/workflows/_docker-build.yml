@@ -3,18 +3,10 @@ name: Docker Build and Push
 on:
   workflow_call:
     inputs:
-      target:
-        required: true
-        type: string
-        description: Dockerfile target stage (e.g. development, production)
       tags:
         required: true
         type: string
         description: Full image tags (newline-separated)
-      cache_scope:
-        required: true
-        type: string
-        description: GHA cache scope key to partition caches
       annotations:
         required: false
         type: string
@@ -56,15 +48,14 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          target: ${{ inputs.target }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ inputs.tags }}
           annotations: ${{ inputs.annotations }}
           provenance: mode=max
           sbom: true
-          cache-from: type=gha,scope=${{ inputs.cache_scope }}
-          cache-to: type=gha,mode=max,scope=${{ inputs.cache_scope }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Comment on PR with image tag
         if: ${{ inputs.pr_number != '' }}

@@ -164,7 +164,7 @@ git rebase main  # or git merge main
 For containerized development:
 
 ```bash
-# Build development image
+# Build Docker image
 make docker-build
 
 # Run tests in container

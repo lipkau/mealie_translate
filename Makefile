@@ -30,7 +30,7 @@
 .PHONY: run compare-models compare-models-basic verify-prompts generate-tags
 
 # Docker targets
-.PHONY: docker-build docker-run docker-dev docker-logs docker-test docker-clean
+.PHONY: docker-build docker-run docker-logs docker-test docker-clean
 
 # Security targets
 .PHONY: security-scan security-bandit security-pip-audit
@@ -152,7 +152,6 @@ help:
 	@echo "Docker Commands:"
 	@echo "  docker-build         Build Docker image"
 	@echo "  docker-run           Run application in Docker container with cron scheduling"
-	@echo "  docker-dev           Run development environment (single run)"
 	@echo "  docker-logs          Follow Docker container logs"
 	@echo "  docker-test          Run tests in Docker container"
 	@echo "  docker-clean         Clean Docker images and containers"
@@ -485,14 +484,6 @@ docker-run:
 	fi
 	@echo "Running application in Docker container with cron scheduling..."
 	docker-compose up mealie-translator
-
-docker-dev:
-	@if [ ! -f ".env" ]; then \
-		echo "⚠️  .env file not found. Run 'make setup-env' first and configure your API keys."; \
-		exit 1; \
-	fi
-	@echo "Starting development environment (single run)..."
-	docker-compose --profile dev up mealie-translator-dev
 
 docker-logs:
 	@echo "Following Docker container logs..."

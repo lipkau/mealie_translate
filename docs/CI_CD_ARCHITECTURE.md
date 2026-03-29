@@ -25,14 +25,12 @@ This project uses a separated CI/CD architecture with two distinct workflows for
 **Triggers**: Successful CI completion (via `workflow_run`)
 **Jobs**:
 
-- **gate**: Lightweight decision job -- determines which images to build (no Docker setup)
-- **build-dev**: Builds `:dev` image (main push or version-tag release)
-- **build-prod**: Builds `:v*` + `:latest` images (version-tag release)
-- **build-pr**: Builds `:pr-<N>` image and comments on the PR
+- **gate**: Lightweight decision job -- computes which tags to apply (no Docker setup)
+- **build**: Single build job that applies all computed tags to one image digest
 
-All build jobs call the reusable workflow `_docker-build.yml` which handles checkout, QEMU,
-buildx, login, build-push, provenance attestation, and SBOM generation.
-For version-tag releases, `build-dev` and `build-prod` run in parallel.
+The build job calls the reusable workflow `_docker-build.yml` which handles checkout, QEMU,
+buildx, login, build-push, provenance attestation, SBOM generation, and optional PR commenting.
+All published images are identical -- same Dockerfile stage, same dependencies, same entrypoint.
 
 **Security**: Relies on separate Security pipeline for comprehensive vulnerability scanning after deployment
 
@@ -131,12 +129,14 @@ Integration tests run conditionally:
 
 ## Docker Image Strategy
 
-| Tag       | Built from                       | Dockerfile target | Purpose                    |
-| --------- | -------------------------------- | ----------------- | -------------------------- |
-| `dev`     | push to `main` / version tag    | development       | Beta users, staging        |
-| `latest`  | version tag on `main`            | production        | Production deployments     |
-| `v1.2.3`  | version tag on `main`            | production        | Pinned production version  |
-| `pr-<N>`  | every PR (automatic)             | development       | Contributor testing        |
+| Tag       | Built from                       | Purpose                    |
+| --------- | -------------------------------- | -------------------------- |
+| `dev`     | push to `main` / version tag    | Beta users, staging        |
+| `latest`  | version tag on `main`            | Production deployments     |
+| `v1.2.3`  | version tag on `main`            | Pinned production version  |
+| `pr-<N>`  | every PR (automatic)             | Contributor testing        |
+
+All tags use the same Dockerfile stage -- there is no separate development image.
 
 - **`dev`**: Always reflects the latest validated code on `main`.
   Also rebuilt during version-tag releases so it stays in sync with the release commit.
@@ -235,10 +235,7 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-This will (in parallel):
-
-1. Build and push production images with tags `v1.0.0` and `latest`
-2. Build and push the `:dev` image so it stays in sync with the release
+This will build a single image and push it with three tags: `v1.0.0`, `latest`, and `dev`.
 
 ### Monitoring Deployments
 
