@@ -31,9 +31,6 @@ make setup-env
 # Build and run with docker-compose
 make docker-build
 make docker-run
-
-# Or run in development mode (with volume mounts)
-make docker-dev
 ```
 
 ## Docker Commands Reference
@@ -41,8 +38,7 @@ make docker-dev
 | Command             | Description                                  |
 | ------------------- | -------------------------------------------- |
 | `make docker-build` | Build Docker image locally                   |
-| `make docker-run`   | Run production container with docker-compose |
-| `make docker-dev`   | Run development container with volume mounts |
+| `make docker-run`   | Run container with cron scheduling            |
 | `make docker-logs`  | Follow container logs                        |
 | `make docker-test`  | Run tests in Docker container                |
 | `make docker-clean` | Clean up Docker images and containers        |
@@ -59,18 +55,20 @@ The project automatically publishes Docker images to GitHub Container Registry (
 
 | Tag       | Description                              | When Updated                  |
 | --------- | ---------------------------------------- | ----------------------------- |
-| `dev`     | Development build with dev dependencies  | Push to main / version tag    |
-| `latest`  | Latest stable release (production stage) | Version tag on main           |
-| `v1.0.0`  | Pinned version (production stage)        | Version tag on main           |
+| `dev`     | Latest validated build from main         | Push to main / version tag    |
+| `latest`  | Latest stable release                    | Version tag on main           |
+| `v1.0.0`  | Pinned version                           | Version tag on main           |
 | `pr-<N>`  | PR preview image for testing             | Every push to an open PR      |
+
+All tags use the same Dockerfile stage and produce identical images.
 
 ### Pulling Images
 
 ```bash
-# Production image
+# Latest stable release
 docker pull ghcr.io/lipkau/mealie_translate:latest
 
-# Development image
+# Latest validated build from main
 docker pull ghcr.io/lipkau/mealie_translate:dev
 
 # Specific version
@@ -115,10 +113,8 @@ Examples:
 - `0 9 * * 1` - Weekly on Monday at 9 AM
 - `*/30 * * * *` - Every 30 minutes
 
-### Production vs Development
-
-- **Production** (`make docker-run`): Uses cron scheduling with configurable intervals
-- **Development** (`make docker-dev`): Runs once for testing
+The container runs the translator once on startup, then continues on the
+configured cron schedule. Use `make docker-run` to start it.
 
 ## Docker Architecture
 
@@ -127,18 +123,13 @@ Examples:
 The Dockerfile uses a multi-stage build process:
 
 1. **Base Stage**: Python 3.14 with system dependencies
-2. **Development Stage**: Includes dev dependencies and testing tools
-3. **Production Stage**: Lightweight image with only runtime dependencies
-4. **Testing Stage**: Runs tests during build (optional)
+2. **Runtime Stage**: Production dependencies, cron entrypoint, healthcheck
+3. **Testing Stage**: Adds dev dependencies and runs tests (CI only, never published)
 
-### Images Sizes
-
-- **Production**: ~200MB (optimized)
-- **Development**: ~300MB (includes dev tools)
+All published images use the `runtime` stage.
 
 ### Security Features
 
-- Non-root user execution
 - Multi-layer optimization
 - Dependency vulnerability scanning
 - Minimal attack surface
@@ -162,12 +153,9 @@ make docker-run
 make docker-logs
 ```
 
-### Development and Testing
+### Testing
 
 ```bash
-# Development environment with volume mounts
-make docker-dev
-
 # Run tests in container
 make docker-test
 ```
@@ -253,9 +241,9 @@ services:
 
 Images are automatically published to GHCR when:
 
-1. **Push to main branch**: Creates `:dev` tag (development target)
-2. **Version tag on main**: Creates `:v*`, `:latest` (production target), and `:dev` (development target)
-3. **Pull request**: Creates `:pr-<N>` tag (development target, deleted on PR close)
+1. **Push to main branch**: Creates `:dev` tag
+2. **Version tag on main**: Creates `:v*`, `:latest`, and `:dev` tags (single build)
+3. **Pull request**: Creates `:pr-<N>` tag (deleted on PR close)
 
 ### Manual Publishing
 
@@ -274,11 +262,11 @@ docker push ghcr.io/lipkau/mealie_translate:custom
 The CD pipeline (`cd.yml` + `_docker-build.yml`) handles:
 
 - Multi-platform builds (linux/amd64 + linux/arm64)
-- Multi-stage builds (development + production targets)
+- Single unified image for all tags
 - Automatic tagging strategy (`:dev`, `:latest`, `:v*`, `:pr-N`)
 - SLSA provenance attestation and SBOM generation
 - GHCR authentication and publishing
-- Scoped build caching per image target
+- GHA build caching
 - Automatic PR image commenting and cleanup
 
 ### Supported Platforms

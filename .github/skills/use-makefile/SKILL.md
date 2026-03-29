@@ -58,7 +58,6 @@ make security-scan  # All security scans (bandit + pip-audit)
 ```bash
 make docker-build   # Build the Docker image locally
 make docker-run     # Run the container (cron mode)
-make docker-dev     # Run development container
 make docker-test    # Run tests inside Docker
 make docker-logs    # Follow container logs
 make docker-clean   # Remove Docker artifacts

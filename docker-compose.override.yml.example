@@ -5,7 +5,7 @@
 services:
   mealie-translator:
     environment:
-      # Override cron schedule for production
+      # Override cron schedule
       # Examples:
       # Daily at 2 AM:     CRON_SCHEDULE: "0 2 * * *"
       # Every 4 hours:     CRON_SCHEDULE: "0 */4 * * *"
@@ -16,20 +16,4 @@ services:
       # Override other settings
       # BATCH_SIZE: 20
       # TARGET_LANGUAGE: "Spanish"
-
-  mealie-translator-dev:
-    volumes:
-      # Mount source code for live reloading
-      - .:/app
-      # Persist pip cache
-      - pip-cache:/home/app/.cache/pip
-    environment:
-      # More frequent runs for development/testing
-      CRON_SCHEDULE: "*/15 * * * *"
-      LOG_LEVEL: "DEBUG"
-    ports:
-      # Expose port if you add a web interface later
-      - "8000:8000"
-
-volumes:
-  pip-cache:
+      # LOG_LEVEL: "DEBUG"

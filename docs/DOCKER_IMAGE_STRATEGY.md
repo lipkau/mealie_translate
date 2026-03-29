@@ -1,60 +1,61 @@
 # Docker Image Strategy
 
-This document explains when and how different Docker images are built
+This document explains when and how Docker images are built
 in the Mealie Recipe Translator project.
 
 ## Overview
 
-The CD pipeline produces three categories of Docker images:
-
-- **Development images** (`target: development`) -- for PR testing and the `:dev` tag
-- **Production images** (`target: production`) -- for versioned releases and `:latest`
+The CD pipeline builds a single image from the default Dockerfile target
+(`runtime`) and applies one or more tags depending on the trigger event.
+All published images are identical -- same base, same dependencies,
+same entrypoint, same behavior.
 
 The pipeline is defined across two workflow files:
 
-- `cd.yml` -- gate job + three caller jobs
-- `_docker-build.yml` -- reusable workflow that all build jobs share
+- `cd.yml` -- gate job that computes tags + one build job
+- `_docker-build.yml` -- reusable workflow the build job calls
 
 ## Image Tags
 
-| Tag       | Built from                       | Dockerfile target | Purpose                    |
-| --------- | -------------------------------- | ----------------- | -------------------------- |
-| `dev`     | push to `main` / version tag    | development       | Beta users, staging        |
-| `latest`  | version tag on `main`            | production        | Production deployments     |
-| `v1.2.3`  | version tag on `main`            | production        | Pinned production version  |
-| `pr-<N>`  | every PR (automatic)             | development       | Contributor testing        |
+| Tag       | Built from                       | Purpose                    |
+| --------- | -------------------------------- | -------------------------- |
+| `dev`     | push to `main` / version tag    | Beta users, staging        |
+| `latest`  | version tag on `main`            | Production deployments     |
+| `v1.2.3`  | version tag on `main`            | Pinned production version  |
+| `pr-<N>`  | every PR (automatic)             | Contributor testing        |
+
+All tags point to the same Dockerfile stage. There is no difference
+between a `:dev` image and a `:latest` image other than the tag.
 
 ## Build Decision Matrix
 
 | Event                  | `:dev` | `:v*` + `:latest` | `:pr-N` | Total builds |
 | ---------------------- | ------ | ------------------ | ------- | ------------ |
 | Push to `main`         | yes    | --                 | --      | 1            |
-| Version tag on `main`  | yes    | yes                | --      | 2 (parallel) |
+| Version tag on `main`  | yes    | yes                | --      | 1            |
 | Pull request           | --     | --                 | yes     | 1            |
 | Tag not on `main`      | --     | --                 | --      | 0            |
+
+For version-tag releases, one build produces all three tags
+(`:dev`, `:v1.2.3`, `:latest`) from a single image digest.
 
 ## Pipeline Architecture
 
 ```mermaid
 flowchart TD
   CI[CI completes] --> gate[gate job]
-  gate -->|"build_dev=true"| buildDev["build-dev (:dev)"]
-  gate -->|"build_prod=true"| buildProd["build-prod (:v* + :latest)"]
-  gate -->|"build_pr=true"| buildPr["build-pr (:pr-N + comment)"]
-  buildPr --> comment["Comment on PR"]
+  gate -->|"tags computed"| build["build (all tags)"]
+  build -->|"pr_number set"| comment["Comment on PR"]
   prClose["PR closed"] --> cleanup["pr-image-cleanup.yml"]
 ```
 
 The `gate` job is lightweight (no Docker setup).
-It determines which downstream build jobs to run and passes outputs
-(tag name, PR number) to them.
+It determines which tags to apply and passes them as a single
+newline-separated output to the build job.
 
-All three build jobs call the same reusable workflow
-(`_docker-build.yml`), which handles checkout, QEMU, buildx, login,
-build-push, provenance, SBOM, and optional PR commenting.
-
-For version-tag releases, `build-dev` and `build-prod` run
-**in parallel** on separate runners.
+The build job calls the reusable workflow (`_docker-build.yml`),
+which handles checkout, QEMU, buildx, login, build-push,
+provenance, SBOM, and optional PR commenting.
 
 ## Build Scenarios
 
@@ -64,7 +65,7 @@ For version-tag releases, `build-dev` and `build-prod` run
 git push origin main
 ```
 
-**Result**: `:dev` image built (development target, multi-arch).
+**Result**: `:dev` image built (multi-arch).
 
 ### 2. Version tag on `main` (release)
 
@@ -73,10 +74,11 @@ git tag -a v1.2.3 -m "Release v1.2.3"
 git push origin v1.2.3
 ```
 
-**Result** (parallel):
+**Result** (single build, three tags):
 
-- `ghcr.io/lipkau/mealie_translate:v1.2.3` + `:latest` (production target)
-- `ghcr.io/lipkau/mealie_translate:dev` (development target)
+- `ghcr.io/lipkau/mealie_translate:v1.2.3`
+- `ghcr.io/lipkau/mealie_translate:latest`
+- `ghcr.io/lipkau/mealie_translate:dev`
 
 ### 3. Pull request (automatic)
 
@@ -85,7 +87,7 @@ No manual tagging required.
 
 **Result**:
 
-- `ghcr.io/lipkau/mealie_translate:pr-<N>` (development target, multi-arch)
+- `ghcr.io/lipkau/mealie_translate:pr-<N>` (multi-arch)
 - Bot comments the `docker pull` command on the PR
 - Image is updated on every subsequent push to the PR
 
@@ -117,13 +119,8 @@ docker buildx imagetools inspect ghcr.io/lipkau/mealie_translate:latest
 
 ## Cache Strategy
 
-Each build job uses a separate GHA cache scope to prevent eviction across targets:
-
-| Job          | Scope  |
-| ------------ | ------ |
-| `build-dev`  | `dev`  |
-| `build-prod` | `prod` |
-| `build-pr`   | `pr`   |
+The build job uses the default GHA cache (no scoped partitioning needed
+since all builds share the same Dockerfile target).
 
 ## Concurrency
 
@@ -143,21 +140,15 @@ Different version tags each get their own group and never cancel each other.
 ### Image not built
 
 1. Check that CI completed successfully (CD only runs on CI success).
-2. For production images, verify the tag follows the `v*` pattern and the
+2. For versioned releases, verify the tag follows the `v*` pattern and the
    tagged commit is on `main`.
-3. Check the `gate` job logs for the `Decide build targets` step output.
+3. Check the `gate` job logs for the `Decide build tags` step output.
 
 ### PR image not appearing
 
 1. Confirm CI passed for the PR.
 2. Check the `gate` job's `Find associated pull request` step -- the PR must
    be open at the time CD runs.
-
-### Wrong image type
-
-Production images use the `production` Dockerfile target.
-Development and PR images use the `development` target.
-If the image has dev dependencies, it was built from the `development` target.
 
 ## Related Documentation
 

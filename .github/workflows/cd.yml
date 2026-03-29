@@ -17,14 +17,11 @@ concurrency:
 
 jobs:
   gate:
-    name: Determine Build Targets
+    name: Determine Build Tags
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     outputs:
-      build_dev: ${{ steps.decide.outputs.build_dev }}
-      build_prod: ${{ steps.decide.outputs.build_prod }}
-      build_pr: ${{ steps.decide.outputs.build_pr }}
-      docker_tag: ${{ steps.find_tag.outputs.tag }}
+      tags: ${{ steps.decide.outputs.tags }}
       pr_number: ${{ steps.find_pr.outputs.result }}
     steps:
       - uses: actions/checkout@v6
@@ -87,7 +84,7 @@ jobs:
             return '';
           result-encoding: string
 
-      - name: Decide build targets
+      - name: Decide build tags
         id: decide
         run: |
           HEAD_BRANCH="${{ github.event.workflow_run.head_branch }}"
@@ -95,63 +92,37 @@ jobs:
           ON_MAIN="${{ steps.on_main.outputs.result }}"
           EVENT="${{ github.event.workflow_run.event }}"
           PR_NUM="${{ steps.find_pr.outputs.result }}"
+          REPO="ghcr.io/${{ github.repository }}"
 
           IS_RELEASE=$([[ -n "$HAS_TAG" && "$ON_MAIN" == "true" ]] && echo true || echo false)
 
-          # Dev image: main-branch push OR version-tag release on main
+          TAGS=""
+
           if [[ "$HEAD_BRANCH" == "main" || "$IS_RELEASE" == "true" ]]; then
-            echo "build_dev=true" >> $GITHUB_OUTPUT
-          else
-            echo "build_dev=false" >> $GITHUB_OUTPUT
+            TAGS="${REPO}:dev"
           fi
 
-          # Prod image: version-tag release on main
-          echo "build_prod=$IS_RELEASE" >> $GITHUB_OUTPUT
+          if [[ "$IS_RELEASE" == "true" ]]; then
+            TAGS="${TAGS}"$'\n'"${REPO}:${HAS_TAG}"
+            TAGS="${TAGS}"$'\n'"${REPO}:latest"
+          fi
 
-          # PR image: pull_request event with an open PR found
           if [[ "$EVENT" == "pull_request" && -n "$PR_NUM" ]]; then
-            echo "build_pr=true" >> $GITHUB_OUTPUT
-          else
-            echo "build_pr=false" >> $GITHUB_OUTPUT
+            TAGS="${REPO}:pr-${PR_NUM}"
           fi
 
-  build-dev:
-    name: Build Dev Image (:dev)
-    needs: gate
-    if: ${{ needs.gate.outputs.build_dev == 'true' }}
-    uses: ./.github/workflows/_docker-build.yml
-    secrets: inherit
-    with:
-      target: development
-      tags: ghcr.io/${{ github.repository }}:dev
-      cache_scope: dev
+          echo "Tags to build: $TAGS"
 
-  build-prod:
-    name: Build Production Image
-    needs: gate
-    if: ${{ needs.gate.outputs.build_prod == 'true' }}
-    uses: ./.github/workflows/_docker-build.yml
-    secrets: inherit
-    with:
-      target: production
-      tags: |-
-        ghcr.io/${{ github.repository }}:${{ needs.gate.outputs.docker_tag }}
-        ghcr.io/${{ github.repository }}:latest
-      cache_scope: prod
+          echo "tags<<EOF" >> $GITHUB_OUTPUT
+          echo "$TAGS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
-  build-pr:
-    name: Build PR Image
+  build:
+    name: Build and Push
     needs: gate
-    if: ${{ needs.gate.outputs.build_pr == 'true' }}
+    if: ${{ needs.gate.outputs.tags != '' }}
     uses: ./.github/workflows/_docker-build.yml
     secrets: inherit
     with:
-      target: development
-      tags: ghcr.io/${{ github.repository }}:pr-${{ needs.gate.outputs.pr_number }}
-      cache_scope: pr
+      tags: ${{ needs.gate.outputs.tags }}
       pr_number: ${{ needs.gate.outputs.pr_number }}
-      annotations: |
-        index:org.opencontainers.image.title=Mealie Recipe Translator (PR)
-        index:org.opencontainers.image.description=PR preview image for testing
-        index:org.opencontainers.image.url=https://github.com/lipkau/mealie_translate
-        index:org.opencontainers.image.source=https://github.com/lipkau/mealie_translate

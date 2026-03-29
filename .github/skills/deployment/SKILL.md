@@ -18,12 +18,14 @@ See [`docs/CI_CD_ARCHITECTURE.md`](../../../docs/CI_CD_ARCHITECTURE.md) for the 
 
 ## Docker Images Published to GHCR
 
-| Tag       | Built from                    | Stage       |
-| --------- | ----------------------------- | ----------- |
-| `dev`     | `main` branch / version tags | development |
-| `latest`  | version tags on `main`        | production  |
-| `v1.2.3`  | version tags on `main`        | production  |
-| `pr-<N>`  | every PR (automatic)          | development |
+| Tag       | Built from                    |
+| --------- | ----------------------------- |
+| `dev`     | `main` branch / version tags |
+| `latest`  | version tags on `main`        |
+| `v1.2.3`  | version tags on `main`        |
+| `pr-<N>`  | every PR (automatic)          |
+
+All tags produce identical images (same Dockerfile stage, same dependencies).
 
 ## How to Create a Production Release
 
@@ -85,8 +87,7 @@ Replace `PREV_TAG` with the real previous tag. You can use `--generate-notes` fo
 ### 5. What happens automatically
 
 1. **CD pipeline** detects the `v*` tag on `main`.
-2. **In parallel**: production image pushed with tags `v1.2.3` and `latest`;
-   development image pushed with tag `dev`.
+2. **Single build** pushes the image with tags `v1.2.3`, `latest`, and `dev`.
 3. **Security pipeline** runs after CD completes (Trivy scan + dependency audit).
 
 ### 6. Monitor the release

@@ -41,51 +41,25 @@ COPY --chown=app:app pyproject.toml ./
 COPY --chown=app:app mealie_translate/ ./mealie_translate/
 COPY --chown=app:app main.py ./
 
-# Stage 2: Development image with dev dependencies
-FROM base AS development
+# Stage 2: Runtime image (the only published image)
+FROM base AS runtime
 
-# Switch to app user
-USER app
-ENV PATH=$PATH:/home/app/.local/bin
-
-# Install development dependencies with pip cache for faster rebuilds
-RUN --mount=type=cache,target=/home/app/.cache/pip,uid=1000,gid=1000 \
-  pip install -e .[dev]
-
-# Copy remaining files (like tests, docs, etc.)
-COPY --chown=app:app . ./
-
-# Stay as app user for development (no cron needed)
-# USER root - not needed for development
-
-# Expose port for development server (if you add one later)
-# EXPOSE 8000
-
-# Development command - for dev, just run once by default
-CMD ["python", "main.py"]
-
-# Stage 3: Production image (lightweight)
-FROM base AS production
-
-# Install production dependencies with pip cache for faster rebuilds
 RUN --mount=type=cache,target=/root/.cache/pip \
   pip install .
 
-# Health check verifies configuration is valid (required env vars are set)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD python -c "from mealie_translate.config import get_settings; s=get_settings(); assert s.mealie_base_url and s.mealie_api_token and s.openai_api_key, 'Missing required config'" || exit 1
 
-# Production command - use our entry script for cron scheduling
 CMD ["/usr/local/bin/docker-entrypoint.sh"]
 
-# Stage 4: Testing image for CI/CD
-FROM development AS testing
+# Stage 3: Testing image for CI (never published)
+FROM runtime AS testing
 
-# Switch to app user to match development environment
-USER app
+COPY --chown=app:app . ./
+RUN --mount=type=cache,target=/root/.cache/pip \
+  pip install .[dev]
 
-# Run tests directly
 RUN python -m pytest tests/ -m "not integration" -q
 
-# Default to production stage
-FROM production
+# Default to runtime stage
+FROM runtime
