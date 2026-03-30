@@ -67,7 +67,7 @@ jobs:
       - name: Find associated pull request
         id: find_pr
         if: ${{ github.event.workflow_run.event == 'pull_request' }}
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const pulls = await github.rest.repos.listPullRequestsAssociatedWithCommit({
