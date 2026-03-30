@@ -69,7 +69,7 @@ jobs:
         run: |
           python -m pytest tests/ -v -m "not integration" --cov=mealie_translate --cov-report=xml --cov-report=term --cov-report=html --junit-xml=pytest-results.xml
 
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v6
         with:
           files: ./coverage.xml
           flags: unittests
