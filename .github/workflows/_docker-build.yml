@@ -59,7 +59,7 @@ jobs:
 
       - name: Comment on PR with image tag
         if: ${{ inputs.pr_number != '' }}
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const prNumber = parseInt('${{ inputs.pr_number }}', 10);
