@@ -30,7 +30,7 @@ dependencies = [
     "httpx[http2]>=0.28.1",
     "openai>=1.109.1",
     "pint>=0.25.3",
-    "python-dotenv>=1.0.0",
+    "python-dotenv>=1.2.2",
     "pydantic>=2.12.5",
     "pydantic-settings>=2.0.0",
 ]
