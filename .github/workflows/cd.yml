@@ -24,7 +24,7 @@ jobs:
       tags: ${{ steps.decide.outputs.tags }}
       pr_number: ${{ steps.find_pr.outputs.result }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         if: ${{ github.event.workflow_run.event != 'pull_request' }}
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
