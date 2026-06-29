@@ -5,7 +5,7 @@
   "private": true,
   "devDependencies": {
     "markdownlint-cli2": "0.22.1",
-    "pyright": "1.1.410"
+    "pyright": "1.1.411"
   },
   "scripts": {
     "lint:markdown": "markdownlint-cli2 \"**/*.md\" \"!.github/**\" \"!.cursor/**\"",
