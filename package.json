@@ -4,7 +4,7 @@
   "description": "Documentation tooling for Mealie Recipe Translator",
   "private": true,
   "devDependencies": {
-    "markdownlint-cli2": "0.23.1",
+    "markdownlint-cli2": "0.23.2",
     "pyright": "1.1.411"
   },
   "scripts": {
