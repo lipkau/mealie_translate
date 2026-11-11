@@ -20,99 +20,47 @@ on:
 permissions:
   contents: read
   packages: write
+  pull-requests: read
   security-events: write
-
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   cleanup-old-images:
-    name: Cleanup Old Ephemeral Images
+    name: Cleanup Old PR Images
     runs-on: ubuntu-latest
     steps:
-      - uses: docker/login-action@v4
+      # Catches PR images that pr-image-cleanup.yml missed, such as a build that finished after
+      # its PR closed. Only versions whose tags are all pr-<N> of closed PRs qualify, so dev, latest
+      # and release tags are never deleted. Untagged versions stay too: they include the platform
+      # manifests of multi-arch images and superseded builds that deployments may still pull by digest.
+      - name: Delete images of closed PRs
+        uses: actions/github-script@v9
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # Delete dev images older than 7 days (keep recent ones for debugging)
-      - name: Delete old dev images
-        run: |
-          echo "🧹 Starting scheduled cleanup of old ephemeral images..."
-
-          # Extract repository name from full repository path
-          REPO_NAME="${{ github.event.repository.name }}"
-          echo "Repository: ${{ github.repository_owner }}/$REPO_NAME"
-
-          # Check if any container packages exist for this organization
-          echo "Checking if container packages exist..."
-          PACKAGES_RESPONSE=$(gh api -H "Accept: application/vnd.github.v3+json" \
-            "/orgs/${{ github.repository_owner }}/packages?package_type=container" 2>/dev/null || echo "[]")
-
-          if [[ "$PACKAGES_RESPONSE" == "[]" ]] || [[ -z "$PACKAGES_RESPONSE" ]]; then
-            echo "ℹ️  No container packages found for this organization yet"
-            echo "This is normal if no Docker images have been published through CI/CD"
-            exit 0
-          fi
-
-          # Filter for packages matching this repository name
-          REPO_PACKAGES=$(echo "$PACKAGES_RESPONSE" | jq -r --arg repo "$REPO_NAME" '.[] | select(.name == $repo) | .name' || echo "")
-
-          if [[ -z "$REPO_PACKAGES" ]]; then
-            echo "ℹ️  No container packages found for repository '$REPO_NAME'"
-            echo "This is normal if Docker images haven't been published for this repository yet"
-            exit 0
-          fi
-
-          # Get all package versions (images) for this repository
-          echo "Fetching package versions..."
-          PACKAGES_JSON=$(gh api -H "Accept: application/vnd.github.v3+json" \
-            "/orgs/${{ github.repository_owner }}/packages/container/$REPO_NAME/versions?per_page=100" 2>/dev/null || echo "[]")
-
-          if [[ "$PACKAGES_JSON" == "[]" ]]; then
-            echo "ℹ️  No package versions found"
-            exit 0
-          fi
-
-          # Filter for ephemeral images (dev and PR tags)
-          PACKAGES=$(echo "$PACKAGES_JSON" | jq -c '.[] | select(.metadata.container.tags[]? | test("^(dev|pr-.*)$")) | {id: .id, tags: .metadata.container.tags, created: .created_at}')
-
-          if [[ -z "$PACKAGES" ]]; then
-            echo "ℹ️  No ephemeral images found"
-            exit 0
-          fi
-
-          # Calculate cutoff date (7 days ago)
-          CUTOFF_DATE=$(date -d '7 days ago' -u +%Y-%m-%dT%H:%M:%SZ)
-
-          echo "Cutoff date: $CUTOFF_DATE"
-          echo "Found ephemeral images:"
-          echo "$PACKAGES" | jq -r '. | "ID: \(.id), Tags: \(.tags | join(", ")), Created: \(.created)"'
-
-          # Delete images older than cutoff
-          OLD_IMAGES=$(echo "$PACKAGES" | jq -r --arg cutoff "$CUTOFF_DATE" 'select(.created < $cutoff) | .id')
-
-          if [[ -z "$OLD_IMAGES" ]]; then
-            echo "✅ No old ephemeral images found to delete"
-          else
-            echo "🗑️  Deleting old ephemeral images:"
-            DELETED_COUNT=0
-            for IMAGE_ID in $OLD_IMAGES; do
-              echo "Deleting image ID: $IMAGE_ID"
-              if gh api --method DELETE -H "Accept: application/vnd.github.v3+json" \
-                "/orgs/${{ github.repository_owner }}/packages/container/$REPO_NAME/versions/$IMAGE_ID" 2>/dev/null; then
-                ((DELETED_COUNT++))
-                echo "✅ Successfully deleted image ID: $IMAGE_ID"
-              else
-                echo "⚠️  Failed to delete image ID: $IMAGE_ID"
-              fi
-            done
-            echo "✅ Cleanup completed - deleted $DELETED_COUNT images"
-          fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pkg = {
+              package_type: 'container',
+              package_name: context.repo.repo,
+              username: context.repo.owner,
+            };
+            const versions = await github.paginate(
+              github.rest.packages.getAllPackageVersionsForPackageOwnedByUser,
+              { ...pkg, per_page: 100 },
+            );
+            const prImages = versions.filter((v) => {
+              const tags = v.metadata?.container?.tags ?? [];
+              return tags.length > 0 && tags.every((t) => /^pr-\d+$/.test(t));
+            });
+            let deleted = 0;
+            for (const v of prImages) {
+              const tags = v.metadata.container.tags;
+              const pulls = await Promise.all(
+                tags.map((t) => github.rest.pulls.get({ ...context.repo, pull_number: Number(t.slice(3)) })),
+              );
+              if (pulls.some(({ data }) => data.state === 'open')) continue;
+              await github.rest.packages.deletePackageVersionForUser({ ...pkg, package_version_id: v.id });
+              core.info(`Deleted ${tags.join(', ')} (${v.name})`);
+              deleted++;
+            }
+            core.info(`Deleted ${deleted} of ${versions.length} package versions`);
 
   dismiss-stale-alerts:
     name: Dismiss Stale Security Alerts

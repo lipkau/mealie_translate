@@ -102,6 +102,8 @@ The gate job's `on_main` check rejects it.
 2. Subsequent pushes -- image is rebuilt, comment is updated (not duplicated).
 3. PR closed (merged or not) -- `pr-image-cleanup.yml` deletes the `:pr-<N>`
    package version from GHCR.
+4. Missed deletions -- the daily `maintenance.yml` job deletes package versions whose only tags are `pr-<N>`
+   of closed PRs. It never deletes `dev`, `latest`, release tags or untagged versions.
 
 ## Supply-Chain Attestation
 
