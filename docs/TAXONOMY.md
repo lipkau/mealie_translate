@@ -58,7 +58,7 @@ Geographic or cultural origin of the dish.
 american, argentinian, brazilian, british, chinese, french, german, greek,
 indian, italian, japanese, korean, lebanese, mexican, middle-eastern,
 moroccan, portuguese, spanish, thai, turkish
-```text
+```
 
 ### Main Ingredient
 
@@ -69,7 +69,7 @@ apple, asparagus, avocado, banana, bean, beef, broccoli, carrot, cheese,
 chicken, chocolate, cod, egg, fish, lamb, lemon, lentil, mushroom, pasta,
 pork, potato, pumpkin, rice, salmon, seafood, shrimp, spinach, tofu, tomato,
 tuna, zucchini
-```text
+```
 
 ### Dietary Attributes
 
@@ -78,7 +78,7 @@ Suitability flags for restrictions or preferences.
 ```text
 dairy-free, gluten-free, halal, keto, kosher, low-carb, low-fat, nut-free,
 paleo, plant-based, vegan, vegetarian, whole30
-```text
+```
 
 ### Cooking Method
 
@@ -88,7 +88,7 @@ Primary technique used to prepare the dish.
 air-fryer, baked, barbecue, boiled, braised, fried, grilled, marinated,
 no-cook, one-pot, pressure-cooked, raw, roasted, slow-cooked, smoked,
 steamed, stir-fried
-```text
+```
 
 ### Flavor Profile
 
@@ -97,7 +97,7 @@ Dominant taste or texture characteristic.
 ```text
 citrusy, creamy, crispy, crunchy, hearty, light, mild, refreshing, rich,
 savory, smoky, spicy, sweet, tangy, umami, zesty
-```text
+```
 
 ### Effort / Time
 
@@ -105,7 +105,7 @@ Complexity and time commitment.
 
 ```text
 5-ingredients, make-ahead, meal-prep, quick, weeknight, weekend-project
-```text
+```
 
 > `quick` means ready in 30 minutes or less end-to-end.
 
@@ -118,7 +118,7 @@ These coexist with the dimensional tags above.
 bolognese, brigadeiro, carbonara, chili, coq-au-vin, feijoada, goulash,
 guacamole, hummus, lasagna, moqueca, pao-de-queijo, paella, pesto, ratatouille,
 risotto, shakshuka, stroganoff, tiramisu
-```text
+```
 
 ## Worked Examples
 
@@ -127,35 +127,35 @@ risotto, shakshuka, stroganoff, tiramisu
 ```text
 categories: snack, bread, breakfast
 tags:       brazilian, pao-de-queijo, cheese, gluten-free, baked, quick
-```text
+```
 
 ### Brazilian breakfast spread
 
 ```text
 categories: breakfast
 tags:       brazilian, cheese, bread, savory
-```text
+```
 
 ### Sweet snack
 
 ```text
 categories: snack
 tags:       sweet, quick
-```text
+```
 
 ### Chicken stir-fry (weeknight dinner)
 
 ```text
 categories: dinner
 tags:       chicken, stir-fried, quick, weeknight, asian-inspired
-```text
+```
 
 ### Chocolate brigadeiro
 
 ```text
 categories: dessert, snack
 tags:       brazilian, brigadeiro, chocolate, sweet, quick, no-cook
-```text
+```
 
 ## Application Rules
 

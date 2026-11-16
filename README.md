@@ -44,28 +44,28 @@ docker run --rm \
 
 1. **Create a `docker-compose.yml` file:**
 
-```yaml
-version: '3.8'
+   ```yaml
+   version: '3.8'
 
-services:
-  mealie-translator:
-    image: ghcr.io/lipkau/mealie_translate:latest
-    environment:
-      - MEALIE_BASE_URL=https://your-mealie-instance.com
-      - MEALIE_API_TOKEN=your-mealie-api-token
-      - OPENAI_API_KEY=your-openai-api-key
-      - CRON_SCHEDULE=0 */6 * * *  # Run every 6 hours
-    restart: unless-stopped
-```
+   services:
+     mealie-translator:
+       image: ghcr.io/lipkau/mealie_translate:latest
+       environment:
+         - MEALIE_BASE_URL=https://your-mealie-instance.com
+         - MEALIE_API_TOKEN=your-mealie-api-token
+         - OPENAI_API_KEY=your-openai-api-key
+         - CRON_SCHEDULE=0 */6 * * *  # Run every 6 hours
+       restart: unless-stopped
+   ```
 
    > 💡 **Tip**: Copy [`docker-compose.example.yml`](docker-compose.example.yml) for a complete template with all
    > configuration options.
 
 1. **Run the service:**
 
-```bash
-docker compose up -d
-```
+   ```bash
+   docker compose up -d
+   ```
 
 ### Configuration
 
