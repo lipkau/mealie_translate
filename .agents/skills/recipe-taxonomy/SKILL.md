@@ -6,7 +6,8 @@ description: Domain knowledge for assigning Mealie recipe categories and tags. U
 # Recipe Taxonomy: Categories and Tags
 
 Recipes are indexed across two orthogonal dimensions: `categories` (course / meal position) and `tags` (descriptive attributes).
-Always read the authoritative vocabulary from [`docs/TAXONOMY.md`](../../../docs/TAXONOMY.md) — that file is the single source of truth.
+Always read the authoritative vocabulary from [`docs/TAXONOMY.md`](../../../docs/TAXONOMY.md).
+That file is the single source of truth.
 The summary below is provided for quick reference.
 
 ## Two Dimensions

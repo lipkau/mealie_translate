@@ -4,7 +4,10 @@
     "htmlcov/**",
     "mealie_recipe_translator.egg-info/**",
     ".venv/**",
-    ".github/**"
+    ".github/**",
+    // Symlinks to AGENTS.md and .agents/skills; the originals are linted.
+    "CLAUDE.md",
+    ".claude/**"
   ],
   "config": {
     "line-length": {
