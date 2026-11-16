@@ -19,5 +19,15 @@
     "linter": {
       "enabled": true
     }
+  },
+  "linter": {
+    "rules": {
+      "nursery": {
+        "useConsistentHeadingLevel": "error",
+        "useFencedCodeLanguage": "error",
+        "useSingleTopLevelHeading": "error",
+        "useTopLevelHeading": "error"
+      }
+    }
   }
 }
