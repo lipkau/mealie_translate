@@ -1,4 +1,3 @@
-<!-- markdownlint-disable-file MD033 -->
 # Mealie Recipe Translator
 
 [![CI](https://github.com/lipkau/mealie_translate/actions/workflows/ci.yml/badge.svg)](https://github.com/lipkau/mealie_translate/actions/workflows/ci.yml)

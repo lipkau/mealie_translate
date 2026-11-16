@@ -35,13 +35,13 @@ make docker-run
 
 ## Docker Commands Reference
 
-| Command             | Description                                  |
-| ------------------- | -------------------------------------------- |
-| `make docker-build` | Build Docker image locally                   |
-| `make docker-run`   | Run container with cron scheduling            |
-| `make docker-logs`  | Follow container logs                        |
-| `make docker-test`  | Run tests in Docker container                |
-| `make docker-clean` | Clean up Docker images and containers        |
+| Command             | Description                           |
+| ------------------- | ------------------------------------- |
+| `make docker-build` | Build Docker image locally            |
+| `make docker-run`   | Run container with cron scheduling    |
+| `make docker-logs`  | Follow container logs                 |
+| `make docker-test`  | Run tests in Docker container         |
+| `make docker-clean` | Clean up Docker images and containers |
 
 ## Available Images
 
@@ -53,12 +53,12 @@ The project automatically publishes Docker images to GitHub Container Registry (
 
 ### Image Tags
 
-| Tag       | Description                              | When Updated                  |
-| --------- | ---------------------------------------- | ----------------------------- |
-| `dev`     | Latest validated build from main         | Push to main / version tag    |
-| `latest`  | Latest stable release                    | Version tag on main           |
-| `v1.0.0`  | Pinned version                           | Version tag on main           |
-| `pr-<N>`  | PR preview image for testing             | Every push to an open PR      |
+| Tag      | Description                      | When Updated               |
+| -------- | -------------------------------- | -------------------------- |
+| `dev`    | Latest validated build from main | Push to main / version tag |
+| `latest` | Latest stable release            | Version tag on main        |
+| `v1.0.0` | Pinned version                   | Version tag on main        |
+| `pr-<N>` | PR preview image for testing     | Every push to an open PR   |
 
 All tags use the same Dockerfile stage and produce identical images.
 
@@ -227,11 +227,11 @@ The project includes `docker-compose.yml` with:
 Create `docker-compose.override.yml` for environment-specific settings:
 
 ```yaml
-version: '3.8'
+version: "3.8"
 services:
   mealie-translator:
     environment:
-      - CRON_SCHEDULE=0 */2 * * *  # Every 2 hours
+      - CRON_SCHEDULE=0 */2 * * * # Every 2 hours
       - LOG_LEVEL=DEBUG
 ```
 
@@ -355,10 +355,10 @@ services:
       resources:
         limits:
           memory: 1G
-          cpus: '0.5'
+          cpus: "0.5"
         reservations:
           memory: 512M
-          cpus: '0.25'
+          cpus: "0.25"
 ```
 
 ## Migration from Local Installation

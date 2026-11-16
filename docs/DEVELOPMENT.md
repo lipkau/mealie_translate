@@ -46,10 +46,10 @@ The project uses Make for all development tasks. Run `make help` for the latest 
 | ----------------------- | ---------------------------- | ------------------- |
 | `make lint`             | Run linting (ruff, pyright)  | Check code quality  |
 | `make lint-format`      | Check code formatting only   | Verify formatting   |
-| `make lint-markdown`    | Check markdown formatting    | Verify docs         |
+| `make lint-markdown`    | Lint and format-check docs   | Verify docs         |
 | `make lint-all`         | Run all linting checks       | Comprehensive check |
 | `make lint-no-markdown` | Run linting without markdown | CI environments     |
-| `make format`           | Auto-format code (ruff)      | Before committing   |
+| `make format`           | Format code and docs         | Before committing   |
 
 > **Note:** `lint-markdown` uses Node.js dependencies from `package.json`. Run `npm install` first if needed.
 > **CI Note:** Use `lint-no-markdown` in CI environments without Node.js setup.
@@ -80,13 +80,13 @@ The project uses Make for all development tasks. Run `make help` for the latest 
 
 ### Docker Commands
 
-| Command             | Description                 | When to Use               |
-| ------------------- | --------------------------- | ------------------------- |
-| `make docker-build` | Build Docker image          | Local Docker testing      |
-| `make docker-run`   | Run with cron scheduling    | Production simulation     |
-| `make docker-logs`  | Follow container logs       | Debugging                 |
-| `make docker-test`  | Run tests in Docker         | Environment testing       |
-| `make docker-clean` | Clean Docker artifacts      | Cleanup                   |
+| Command             | Description              | When to Use           |
+| ------------------- | ------------------------ | --------------------- |
+| `make docker-build` | Build Docker image       | Local Docker testing  |
+| `make docker-run`   | Run with cron scheduling | Production simulation |
+| `make docker-logs`  | Follow container logs    | Debugging             |
+| `make docker-test`  | Run tests in Docker      | Environment testing   |
+| `make docker-clean` | Clean Docker artifacts   | Cleanup               |
 
 ### Utility Commands
 

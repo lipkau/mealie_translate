@@ -9,8 +9,8 @@ Mealie provides two organiser fields with different roles in this project:
 
 | Field        | Role                                                       | Cardinality                    | Examples                         |
 | ------------ | ---------------------------------------------------------- | ------------------------------ | -------------------------------- |
-| `categories` | **Course / meal position** — *when* is the dish eaten?     | Small, controlled (~12 values) | `breakfast`, `dinner`, `dessert` |
-| `tags`       | **Descriptive attributes** — *what is it, how is it made?* | Open, extendable, multi-value  | `brazilian`, `chicken`, `quick`  |
+| `categories` | **Course / meal position** — _when_ is the dish eaten?     | Small, controlled (~12 values) | `breakfast`, `dinner`, `dessert` |
+| `tags`       | **Descriptive attributes** — _what is it, how is it made?_ | Open, extendable, multi-value  | `brazilian`, `chicken`, `quick`  |
 
 A recipe can belong to **one or more categories** and carry **any number of tags**.
 The combination of the two dimensions enables precise compound discovery:
@@ -20,7 +20,7 @@ The combination of the two dimensions enables precise compound discovery:
 | "Brazilian breakfast"       | `breakfast`     | `brazilian`              |
 | "Sweet snack"               | `snack`         | `sweet`                  |
 | "Main dish with chicken"    | `dinner`        | `chicken`                |
-| "Pão de queijo"             | *(any)*         | `pao-de-queijo`          |
+| "Pão de queijo"             | _(any)_         | `pao-de-queijo`          |
 | "Vegetarian Italian dinner" | `dinner`        | `italian` + `vegetarian` |
 
 ## Categories — Controlled Vocabulary
