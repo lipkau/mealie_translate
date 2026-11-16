@@ -52,21 +52,6 @@ All published images are identical -- same Dockerfile stage, same dependencies, 
 **Note**: This pipeline provides the primary security validation for the project, scanning both source code and
 published container images
 
-### 🤖 Dependabot Auto-merge - `.github/workflows/dependabot.yml`
-
-**Purpose**: Automate dependency updates with safe auto-merge
-**Triggers**: Dependabot pull requests (opened, synchronized, reopened)
-**Behavior**:
-
-- **Patch & Minor Updates**: Enables auto-merge for patch and minor-level dependency updates
-- **Docker Updates**: Auto-merge for Docker base image patch and minor updates
-- **GitHub Actions**: Auto-merge for GitHub Actions workflow updates
-- **Manual Approval Required**: Due to GitHub security restrictions, auto-approval is not possible
-- **Smart Comments**: Provides helpful context and commands for manual review
-
-**Note**: While auto-merge is enabled, maintainer approval is still required due to GitHub's security policy that
-prevents Actions from approving their own PRs.
-
 ## Benefits of Separation
 
 ### ⚡ Performance
