@@ -55,7 +55,8 @@ jobs:
           provenance: mode=max
           sbom: true
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # The cache is an optimisation; a refused cache write (e.g. for PR builds) must not fail the image.
+          cache-to: type=gha,mode=max,ignore-error=true
 
       - name: Comment on PR with image tag
         if: ${{ inputs.pr_number != '' }}
