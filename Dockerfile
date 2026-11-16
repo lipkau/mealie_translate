@@ -1,5 +1,5 @@
 # Stage 1: Base image with Python requirements
-FROM python:3.14-slim-trixie AS base
+FROM python:3.15-slim-trixie AS base
 
 
 # Add image labels for metadata
