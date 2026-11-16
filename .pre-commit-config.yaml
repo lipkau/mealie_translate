@@ -21,10 +21,11 @@ repos:
 
   - repo: local
     hooks:
-      - id: markdownlint
-        name: markdownlint
-        entry: npx markdownlint-cli2
+      - id: biome-markdown
+        name: Biome (Markdown)
+        entry: npm run lint:markdown
         language: system
+        pass_filenames: false
         types: [markdown]
 
   - repo: local

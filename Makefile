@@ -112,10 +112,10 @@ help:
 	@echo "Code Quality:"
 	@echo "  lint                 Run code linting (ruff, pyright)"
 	@echo "  lint-format          Check code formatting (ruff)"
-	@echo "  lint-markdown        Check markdown formatting (markdownlint-cli2)"
+	@echo "  lint-markdown        Lint and format-check Markdown (Biome)"
 	@echo "  lint-all             Run all linting and formatting checks"
 	@echo "  lint-no-markdown     Run linting without markdown (for CI)"
-	@echo "  format               Format code with ruff"
+	@echo "  format               Format code with ruff and Markdown with Biome"
 	@echo "  check                Test local changes: lint-all + test (⭐ shorthand)"
 	@echo ""
 	@echo "CI Targets (use system Python, minimal output):"
@@ -326,7 +326,7 @@ lint-markdown:
 		echo "Using npm lint:markdown (from package.json)..."; \
 		npm run lint:markdown; \
 	else \
-		echo "⚠️  markdownlint-cli2 not found. Install with: npm install"; \
+		echo "⚠️  npm not found. Install Node.js, then run: npm install"; \
 		exit 1; \
 	fi
 
@@ -338,6 +338,8 @@ format: .ensure-ruff
 	@echo "Formatting code with ruff..."
 	$(PYTHON) -m ruff check --fix $(SOURCES)
 	$(PYTHON) -m ruff format $(SOURCES)
+	@echo "Formatting Markdown with Biome..."
+	npm run format:markdown
 
 check: lint-all test
 

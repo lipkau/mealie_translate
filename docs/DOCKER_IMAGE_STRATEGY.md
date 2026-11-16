@@ -17,24 +17,24 @@ The pipeline is defined across two workflow files:
 
 ## Image Tags
 
-| Tag       | Built from                       | Purpose                    |
-| --------- | -------------------------------- | -------------------------- |
-| `dev`     | push to `main` / version tag    | Beta users, staging        |
-| `latest`  | version tag on `main`            | Production deployments     |
-| `v1.2.3`  | version tag on `main`            | Pinned production version  |
-| `pr-<N>`  | every PR (automatic)             | Contributor testing        |
+| Tag      | Built from                   | Purpose                   |
+| -------- | ---------------------------- | ------------------------- |
+| `dev`    | push to `main` / version tag | Beta users, staging       |
+| `latest` | version tag on `main`        | Production deployments    |
+| `v1.2.3` | version tag on `main`        | Pinned production version |
+| `pr-<N>` | every PR (automatic)         | Contributor testing       |
 
 All tags point to the same Dockerfile stage. There is no difference
 between a `:dev` image and a `:latest` image other than the tag.
 
 ## Build Decision Matrix
 
-| Event                  | `:dev` | `:v*` + `:latest` | `:pr-N` | Total builds |
-| ---------------------- | ------ | ------------------ | ------- | ------------ |
-| Push to `main`         | yes    | --                 | --      | 1            |
-| Version tag on `main`  | yes    | yes                | --      | 1            |
-| Pull request           | --     | --                 | yes     | 1            |
-| Tag not on `main`      | --     | --                 | --      | 0            |
+| Event                 | `:dev` | `:v*` + `:latest` | `:pr-N` | Total builds |
+| --------------------- | ------ | ----------------- | ------- | ------------ |
+| Push to `main`        | yes    | --                | --      | 1            |
+| Version tag on `main` | yes    | yes               | --      | 1            |
+| Pull request          | --     | --                | yes     | 1            |
+| Tag not on `main`     | --     | --                | --      | 0            |
 
 For version-tag releases, one build produces all three tags
 (`:dev`, `:v1.2.3`, `:latest`) from a single image digest.

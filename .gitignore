@@ -64,7 +64,7 @@ docker-compose.override.yml
 # Documentation
 docs/_build/
 
-# Node.js (for markdownlint)
+# Node.js (Biome and pyright)
 node_modules/
 
 # Packaging

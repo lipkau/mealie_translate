@@ -1,0 +1,23 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.6.7/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": ["**/*.md", "!.github"]
+  },
+  "formatter": {
+    "useEditorconfig": true,
+    "lineWidth": 120
+  },
+  "markdown": {
+    "formatter": {
+      "enabled": true
+    },
+    "linter": {
+      "enabled": true
+    }
+  }
+}

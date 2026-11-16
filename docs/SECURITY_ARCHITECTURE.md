@@ -403,9 +403,9 @@ issues and CVEs without available patches. This leads to thousands of alerts tha
 ```yaml
 uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
 with:
-  severity: "HIGH,CRITICAL"    # Skip LOW, MEDIUM noise
-  ignore-unfixed: true         # Skip CVEs without available patches
-  vuln-type: "os,library"      # Focus on OS packages and libraries
+  severity: "HIGH,CRITICAL" # Skip LOW, MEDIUM noise
+  ignore-unfixed: true # Skip CVEs without available patches
+  vuln-type: "os,library" # Focus on OS packages and libraries
 ```
 
 **Key Configuration Options**:

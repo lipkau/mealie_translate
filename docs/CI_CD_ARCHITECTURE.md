@@ -114,12 +114,12 @@ Integration tests run conditionally:
 
 ## Docker Image Strategy
 
-| Tag       | Built from                       | Purpose                    |
-| --------- | -------------------------------- | -------------------------- |
-| `dev`     | push to `main` / version tag    | Beta users, staging        |
-| `latest`  | version tag on `main`            | Production deployments     |
-| `v1.2.3`  | version tag on `main`            | Pinned production version  |
-| `pr-<N>`  | every PR (automatic)             | Contributor testing        |
+| Tag      | Built from                   | Purpose                   |
+| -------- | ---------------------------- | ------------------------- |
+| `dev`    | push to `main` / version tag | Beta users, staging       |
+| `latest` | version tag on `main`        | Production deployments    |
+| `v1.2.3` | version tag on `main`        | Pinned production version |
+| `pr-<N>` | every PR (automatic)         | Contributor testing       |
 
 All tags use the same Dockerfile stage -- there is no separate development image.
 
@@ -155,10 +155,10 @@ The Continuous Deployment workflow requires specific GitHub permissions to funct
 
 ```yaml
 permissions:
-  contents: read       # Access repository code
-  packages: write      # Push to GitHub Container Registry (GHCR)
+  contents: read # Access repository code
+  packages: write # Push to GitHub Container Registry (GHCR)
   pull-requests: write # Comment on PRs with image tags
-  id-token: write      # OIDC token for provenance attestation
+  id-token: write # OIDC token for provenance attestation
 ```
 
 #### `security-scan` job
