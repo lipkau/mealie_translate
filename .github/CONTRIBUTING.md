@@ -287,7 +287,8 @@ The project follows semantic versioning (SemVer):
 - **MINOR**: New features (backward compatible)
 - **PATCH**: Bug fixes (backward compatible)
 
-Releases are automated through GitHub Actions when tags are pushed.
+Releases are automated through GitHub Actions when tags are pushed. [docs/RELEASING.md](../docs/RELEASING.md) has the
+steps.
 
 ## Community and Communication
 

@@ -1,12 +1,7 @@
----
-name: release
-description: Cut a mealie_translate release. Use when asked to release, tag a version, pick the next semver, or draft release notes.
----
-
-# Release
+# Releasing
 
 A release is a `vX.Y.Z` tag on a commit on `main`.
-Pushing it makes CI and CD publish the image tags listed in [`docs/DOCKER_IMAGE_STRATEGY.md`](../../../docs/DOCKER_IMAGE_STRATEGY.md),
+Pushing it makes CI and CD publish the image tags listed in [`DOCKER_IMAGE_STRATEGY.md`](DOCKER_IMAGE_STRATEGY.md),
 including `latest`.
 Nothing is deployed from this repository: `lipkau/home.lab` picks the new version up.
 
