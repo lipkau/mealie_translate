@@ -103,7 +103,7 @@ The project includes a comprehensive Makefile. Essential commands for contributo
 ```bash
 make setup-full     # Complete contributor setup with pre-commit hooks
 make test-unit      # Quick unit tests during development
-make format         # Auto-format code (ruff)
+make format         # Format code (ruff) and Markdown (Biome)
 make lint           # Check code quality (ruff, pyright)
 make test           # Full test suite before committing
 ```

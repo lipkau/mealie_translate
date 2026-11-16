@@ -9,7 +9,7 @@
     "charliermarsh.ruff",
 
     // Documentation & Markdown
-    "davidanson.vscode-markdownlint",
+    "biomejs.biome",
 
     // Container Development
     "ms-azuretools.vscode-docker",

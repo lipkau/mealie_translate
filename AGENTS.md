@@ -21,11 +21,12 @@ environment, which `make setup` creates in `.venv/`.
 - Mock HTTP in tests with `respx` (the clients use httpx). Unit tests make no network calls; mark tests that do with
   `@pytest.mark.integration`.
 - Add runtime dependencies to `[project] dependencies` in `pyproject.toml` and tooling to the `dev` extra, then run
-  `make setup`. Node is only for markdownlint.
+  `make setup`. Node provides only Biome and pyright.
 
 ## Documentation
 
-- One sentence per line, at most 120 characters. `make lint-markdown` checks the rest of the style.
+- One sentence per line, at most 120 characters; no tool checks either, so keep to them yourself.
+  `make lint-markdown` checks formatting and the rest of the style, and `make format` fixes the formatting.
 - List a new file under `docs/` in `docs/README.md`.
 
 ## Commits and branches

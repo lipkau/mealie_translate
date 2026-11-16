@@ -4,11 +4,11 @@
   "description": "Documentation tooling for Mealie Recipe Translator",
   "private": true,
   "devDependencies": {
-    "markdownlint-cli2": "0.24.1",
+    "@biomejs/biome": "2.6.7",
     "pyright": "1.1.414"
   },
   "scripts": {
-    "lint:markdown": "markdownlint-cli2 \"**/*.md\" \"!.github/**\" \"!.cursor/**\"",
-    "lint:markdown:fix": "markdownlint-cli2 --fix \"**/*.md\" \"!.github/**\" \"!.cursor/**\""
+    "lint:markdown": "biome check",
+    "format:markdown": "biome check --write"
   }
 }

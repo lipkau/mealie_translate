@@ -71,7 +71,7 @@ updates:
         patterns:
           - "*"
 
-  # NPM dependencies for markdownlint
+  # NPM dependencies for Biome and pyright
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
