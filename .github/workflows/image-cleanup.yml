@@ -33,7 +33,7 @@ jobs:
       packages: write
       pull-requests: read
     steps:
-      - uses: lipkau/gh-tools/actions/ghcr-cleanup@b7be0b919a5bd01128a48589a12720335e257a1b # feat/ghcr-cleanup, until ghcr-cleanup/v1.0.0
+      - uses: lipkau/gh-tools/actions/ghcr-cleanup@a51bee9f544395bd6bad56d82ac9afe29f27aa02 # feat/ghcr-cleanup, until ghcr-cleanup/v1.0.0
         with:
           dry-run: ${{ inputs.dry-run || false }}
           keep-tags: ^dev$
