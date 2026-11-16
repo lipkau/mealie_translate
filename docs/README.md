@@ -13,6 +13,7 @@ This directory contains all project documentation for the Mealie Recipe Translat
 - **[Development Guide](DEVELOPMENT.md)** - Comprehensive developer guide including tools, optimizations, and all 35+
   Makefile commands
 - **[Docker Guide](DOCKER.md)** - Complete Docker containerization, deployment, scheduling, and registry guide
+- **[Releasing](RELEASING.md)** - Cutting a version: checks, semver choice, release notes, tag and publish
 
 ## Recipe Organisation
 
@@ -63,6 +64,8 @@ docs/
 ├── DEVELOPMENT.md               # Complete developer guide (commands, tools, optimizations)
 ├── DOCKER.md                    # Complete Docker guide (deployment, scheduling, registry)
 ├── DOCKER_IMAGE_STRATEGY.md    # Image tagging, build pipeline, and decision matrix
+├── RELEASING.md                # How to cut a release
+├── TAXONOMY.md                 # Recipe categories and tags
 ├── CI_CD_ARCHITECTURE.md       # Separated pipeline architecture
 ├── SECURITY_ARCHITECTURE.md    # Multi-layered security scanning and tool migration history
 └── ARTIFACTS.md                # CI/CD pipeline artifacts

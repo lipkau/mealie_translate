@@ -313,10 +313,7 @@ make docker-build
 
 ### Version Management
 
-1. **Update Version**: Edit `pyproject.toml`
-2. **Create Tag**: `git tag v1.0.0`
-3. **Push**: `git push origin main && git push origin v1.0.0`
-4. **Automatic**: GitHub Actions builds and publishes Docker images
+Follow [RELEASING.md](RELEASING.md). Pushing the version tag makes GitHub Actions build and publish the Docker images.
 
 ### Docker Images
 

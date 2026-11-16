@@ -39,7 +39,7 @@ environment, which `make setup` creates in `.venv/`.
 CI publishes `ghcr.io/lipkau/mealie_translate`; `docs/DOCKER_IMAGE_STRATEGY.md` lists the tags.
 This repository only publishes images. The deployment lives in `lipkau/home.lab`.
 
-## Skills
+## Reference
 
-- `release`: cutting a version and writing its release notes.
-- `recipe-taxonomy`: assigning or reviewing recipe categories and tags, or changing the prompts that do.
+- `docs/RELEASING.md`: read before cutting a version or writing its release notes.
+- `docs/TAXONOMY.md`: read before assigning or reviewing recipe categories and tags, or changing the prompts that do.
