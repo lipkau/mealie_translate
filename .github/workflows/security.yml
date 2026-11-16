@@ -212,7 +212,7 @@ jobs:
 
       - name: Run Trivy vulnerability scanner
         if: steps.image-check.outputs.exists == 'true'
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev
           format: "sarif"
@@ -264,7 +264,7 @@ jobs:
 
       - name: Run Trivy vulnerability scanner
         if: steps.image-check.outputs.exists == 'true'
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           format: "sarif"
@@ -417,7 +417,7 @@ jobs:
 
       - name: Run Trivy vulnerability scanner
         if: steps.trivy-image-check.outputs.exists == 'true'
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           format: "sarif"
