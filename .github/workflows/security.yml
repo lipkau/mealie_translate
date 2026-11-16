@@ -1,9 +1,9 @@
 name: Security Scanning
 
 on:
-  # Trigger after successful CD deployment
+  # Trigger after CI, which publishes the image
   workflow_run:
-    workflows: ["Continuous Deployment"]
+    workflows: ["Continuous Integration"]
     types: [completed]
     branches: [main]
 
@@ -25,16 +25,16 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  # Only run if CD workflow succeeded
+  # Only run if CI succeeded
   check-cd-status:
-    name: Check CD Status
+    name: Check CI Status
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_run'
     outputs:
       cd-passed: ${{ steps.check.outputs.result }}
       should-scan: ${{ steps.check.outputs.should-scan }}
     steps:
-      - name: Check CD workflow result
+      - name: Check CI workflow result
         id: check
         run: |
           if [ "${{ github.event.workflow_run.conclusion }}" == "success" ]; then
@@ -62,23 +62,23 @@ jobs:
       actions: read
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.14"
 
       # CodeQL static analysis with false positive filtering
-      - uses: github/codeql-action/init@v4
+      - uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           languages: python
           config-file: ./.github/codeql/codeql-config.yml
           queries: security-and-quality
 
       # Manual build step for CodeQL (prevents autobuild conflicts)
-      - uses: github/codeql-action/autobuild@v4
+      - uses: github/codeql-action/autobuild@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
 
-      - uses: github/codeql-action/analyze@v4
+      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           category: "/language:python"
           upload: false
@@ -86,7 +86,7 @@ jobs:
         continue-on-error: true
 
       - name: Cache pip dependencies
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-security-3.14-${{ hashFiles('pyproject.toml') }}
@@ -161,13 +161,13 @@ jobs:
 
       - name: Upload filtered CodeQL results
         if: always()
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           sarif_file: codeql-filtered.sarif
           category: "/language:python"
         continue-on-error: true
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: python-security-reports-${{ github.run_id }}
@@ -178,11 +178,11 @@ jobs:
           retention-days: 30
 
   docker-security-scan-dev:
-    name: Docker Image Security (dev)
+    name: Docker Image Security (main)
     runs-on: ubuntu-latest
     if: |
       !cancelled() && (
-        (github.event_name == 'workflow_dispatch' && github.event.inputs.image_tag == 'dev') ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.image_tag == 'main') ||
         (github.event_name == 'schedule') ||
         (github.event_name == 'workflow_run' && needs.check-cd-status.outputs.should-scan == 'true' && github.event.workflow_run.head_branch == 'main')
       )
@@ -195,26 +195,26 @@ jobs:
       actions: read
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
-      - name: Check if dev image exists
+      - name: Check if main image exists
         id: image-check
         run: |
-          if docker manifest inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev > /dev/null 2>&1; then
+          if docker manifest inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main > /dev/null 2>&1; then
             echo "exists=true" >> $GITHUB_OUTPUT
-            echo "Image dev exists"
+            echo "Image main exists"
           else
             echo "exists=false" >> $GITHUB_OUTPUT
-            echo "Image dev does not exist, skipping scan"
+            echo "Image main does not exist, skipping scan"
           fi
 
       - name: Run Trivy vulnerability scanner
         if: steps.image-check.outputs.exists == 'true'
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main
           format: "sarif"
           output: "trivy-results-dev.sarif"
           severity: "HIGH,CRITICAL"
@@ -223,10 +223,11 @@ jobs:
 
       - name: Upload Trivy scan results to GitHub Security tab
         if: steps.image-check.outputs.exists == 'true'
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         continue-on-error: true
         with:
           sarif_file: "trivy-results-dev.sarif"
+          # Builds of main were tagged `dev` before; the category keeps the existing alerts' history.
           category: "docker-dev"
 
   docker-security-scan-latest:
@@ -247,7 +248,7 @@ jobs:
       actions: read
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -275,7 +276,7 @@ jobs:
 
       - name: Upload Trivy scan results to GitHub Security tab
         if: steps.image-check.outputs.exists == 'true'
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         continue-on-error: true
         with:
           sarif_file: "trivy-results-latest.sarif"
@@ -300,7 +301,7 @@ jobs:
       pull-requests: write # For PR comments
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Check if latest image exists for Scout scan
         id: scout-image-check
@@ -316,12 +317,12 @@ jobs:
       # Set up Docker Buildx (required for Scout)
       - name: Set up Docker Buildx
         if: steps.scout-image-check.outputs.exists == 'true'
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       # Login to GitHub Container Registry (required for Docker Scout)
       - name: Log in to Container Registry
         if: steps.scout-image-check.outputs.exists == 'true'
-        uses: docker/login-action@v4
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -329,7 +330,7 @@ jobs:
 
       - name: Docker Scout CVE Analysis
         if: steps.scout-image-check.outputs.exists == 'true'
-        uses: docker/scout-action@v1
+        uses: docker/scout-action@4bbf17a9da65a7b5497361bb407e88cc9548f69c # v1.28.0
         with:
           command: cves
           image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
@@ -339,7 +340,7 @@ jobs:
 
       - name: Docker Scout Policy Evaluation
         if: steps.scout-image-check.outputs.exists == 'true'
-        uses: docker/scout-action@v1
+        uses: docker/scout-action@4bbf17a9da65a7b5497361bb407e88cc9548f69c # v1.28.0
         with:
           command: policy
           image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
@@ -348,7 +349,7 @@ jobs:
 
       - name: Docker Scout SBOM Generation
         if: steps.scout-image-check.outputs.exists == 'true'
-        uses: docker/scout-action@v1
+        uses: docker/scout-action@4bbf17a9da65a7b5497361bb407e88cc9548f69c # v1.28.0
         with:
           command: sbom
           image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
@@ -358,7 +359,7 @@ jobs:
 
       - name: Upload Scout CVE results to GitHub Security tab
         if: steps.scout-image-check.outputs.exists == 'true' && hashFiles('docker-scout-cves.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         continue-on-error: true
         with:
           sarif_file: docker-scout-cves.sarif
@@ -366,7 +367,7 @@ jobs:
 
       - name: Upload Scout artifacts
         if: steps.scout-image-check.outputs.exists == 'true' && always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: docker-scout-results
           path: |
@@ -394,7 +395,7 @@ jobs:
       actions: read
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Check if latest image exists for Trivy scan
         id: trivy-image-check
@@ -409,7 +410,7 @@ jobs:
 
       - name: Login to GitHub Container Registry
         if: steps.trivy-image-check.outputs.exists == 'true'
-        uses: docker/login-action@v4
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -428,14 +429,14 @@ jobs:
 
       - name: Upload Trivy scan results to GitHub Security tab
         if: steps.trivy-image-check.outputs.exists == 'true'
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           sarif_file: "trivy-results.sarif"
           category: "trivy"
 
       - name: Upload Trivy results
         if: steps.trivy-image-check.outputs.exists == 'true' && always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: trivy-results
           path: trivy-results.sarif
@@ -501,7 +502,7 @@ jobs:
 
       - name: Comment on commit (if triggered by CD)
         if: github.event_name == 'workflow_run' && needs.check-cd-status.outputs.should-scan == 'true'
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |

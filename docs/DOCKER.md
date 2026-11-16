@@ -53,14 +53,16 @@ The project automatically publishes Docker images to GitHub Container Registry (
 
 ### Image Tags
 
-| Tag      | Description                      | When Updated               |
-| -------- | -------------------------------- | -------------------------- |
-| `dev`    | Latest validated build from main | Push to main / version tag |
-| `latest` | Latest stable release            | Version tag on main        |
-| `v1.0.0` | Pinned version                   | Version tag on main        |
-| `pr-<N>` | PR preview image for testing     | Every push to an open PR   |
+| Tag                             | Description                      | When Updated             |
+| ------------------------------- | -------------------------------- | ------------------------ |
+| `latest`                        | Latest stable release            | Version tag on main      |
+| `1.2.3`, `1.2`, `1`, `v1.2.3`   | Releases                         | Version tag on main      |
+| `main`                          | Latest validated build from main | Push to main             |
+| `sha-<commit>`                  | Any build, by commit             | Every build              |
+| branch name (`fix/x` → `fix-x`) | PR preview image for testing     | Every push to an open PR |
 
 All tags use the same Dockerfile stage and produce identical images.
+[Docker Image Strategy](DOCKER_IMAGE_STRATEGY.md) has the details.
 
 ### Pulling Images
 
@@ -69,7 +71,7 @@ All tags use the same Dockerfile stage and produce identical images.
 docker pull ghcr.io/lipkau/mealie_translate:latest
 
 # Latest validated build from main
-docker pull ghcr.io/lipkau/mealie_translate:dev
+docker pull ghcr.io/lipkau/mealie_translate:main
 
 # Specific version
 docker pull ghcr.io/lipkau/mealie_translate:v1.0.0
@@ -241,9 +243,9 @@ services:
 
 Images are automatically published to GHCR when:
 
-1. **Push to main branch**: Creates `:dev` tag
-2. **Version tag on main**: Creates `:v*`, `:latest`, and `:dev` tags (single build)
-3. **Pull request**: Creates `:pr-<N>` tag (deleted on PR close)
+1. **Push to main branch**: `:main` and `:sha-<commit>`
+2. **Version tag on main**: `:1.2.3`, `:1.2`, `:1`, `:v1.2.3`, `:latest` and `:sha-<commit>` (single build)
+3. **Pull request**: the branch name and `:sha-<commit>` (deleted on PR close)
 
 ### Manual Publishing
 
@@ -259,15 +261,17 @@ docker push ghcr.io/lipkau/mealie_translate:custom
 
 ### CI/CD Integration
 
-The CD pipeline (`cd.yml` + `_docker-build.yml`) handles:
+The `Image` job in `ci.yml` uses the shared
+[container-image](https://github.com/lipkau/gh-tools/tree/main/actions/container-image) action, which handles:
 
 - Multi-platform builds (linux/amd64 + linux/arm64)
 - Single unified image for all tags
-- Automatic tagging strategy (`:dev`, `:latest`, `:v*`, `:pr-N`)
+- The tagging scheme above
 - SLSA provenance attestation and SBOM generation
 - GHCR authentication and publishing
 - GHA build caching
-- Automatic PR image commenting and cleanup
+
+`image-cleanup.yml` deletes a PR's images when it closes.
 
 ### Supported Platforms
 

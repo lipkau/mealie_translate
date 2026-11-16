@@ -9,7 +9,7 @@ Our security scanning is implemented across three distinct workflows, each with 
 ```mermaid
 graph TD
     A[Developer Push/PR] --> B[CI: Continuous Integration]
-    B --> C[CD: Continuous Deployment]
+    B --> C[CI: Image job]
     C --> D[Security: Comprehensive Scanning]
 
     B --> E[Basic Security Checks]
@@ -43,28 +43,30 @@ graph TD
 make security-scan
 ```
 
-## 2. CD Pipeline (Image Building)
+## 2. Image Publishing
 
-**File**: `.github/workflows/cd.yml`
-**Triggers**: Main branch pushes, tags, successful CI
-**Purpose**: Build and publish container images
+**File**: the `Image` job in `.github/workflows/ci.yml`
+**Triggers**: pull requests, pushes to `main`, version tags, after every other CI job passes
+**Purpose**: Build and publish the container image
 
 ### What it does
 
-- 🏗️ **Builds** Docker images (development & production)
-- 📦 **Publishes** to GitHub Container Registry
-- 🚀 **Deploys** to staging/production environments
+- 🏗️ **Builds** the image with the shared
+  [container-image](https://github.com/lipkau/gh-tools/tree/main/actions/container-image) action
+- 📦 **Publishes** to GitHub Container Registry, with a provenance attestation and an SBOM
+
+This repository doesn't deploy. The deployment lives in `lipkau/home.lab`.
 
 ### Security considerations
 
 - Uses **multi-stage** Docker builds for minimal attack surface
-- **Signs** container images (future enhancement)
+- Actions are **pinned by commit SHA**
 - **Minimal** base images
 
 ## 3. Security Pipeline (Comprehensive & Deep)
 
 **File**: `.github/workflows/security.yml`
-**Triggers**: After successful CD, weekly schedule, manual
+**Triggers**: After CI on `main`, monthly schedule, manual
 **Purpose**: Comprehensive security analysis of published artifacts
 
 ### What it scans
@@ -81,7 +83,7 @@ make security-scan
 - 🔍 **Base image** security analysis
 - 📋 **SARIF reports** to GitHub Security tab
 - 📊 **Multiple output formats** (SARIF, JSON, table)
-- 🎯 **Multiple image tags** (latest, dev)
+- 🎯 **Multiple image tags** (latest, main)
 - 📈 **Vulnerability severity breakdown** in workflow summaries
 - 🎚️ **Severity filtering** — Only HIGH and CRITICAL vulnerabilities are reported
 - 🔧 **Actionable results** — Unfixed CVEs (no patch available) are excluded
@@ -98,8 +100,8 @@ make security-scan
 ### Automatic Triggers
 
 1. **Every code change** → CI security scan (basic)
-2. **After successful CD** → Comprehensive security scan
-3. **Weekly schedule** → Full security audit (Monday 2 AM UTC)
+2. **After CI on `main`** → Comprehensive security scan
+3. **Monthly schedule** → Full security audit (1st of the month, 2 AM UTC)
 
 ### Manual Triggers
 
@@ -123,7 +125,7 @@ gh workflow run security.yml --field image_tag=v1.2.3
 
 ### Notifications
 
-- **Commit comments** on main branch after CD
+- **Commit comments** on main branch after CI
 - **Workflow summary** with security status
 - **Email notifications** for failed scans (configurable)
 
@@ -159,7 +161,7 @@ workflow_dispatch:
 ### 🔄 **Separation of Concerns**
 
 - **CI**: Fast development feedback
-- **CD**: Reliable deployments
+- **Image job**: Publishes only validated code
 - **Security**: Deep analysis without blocking
 
 ### ⚡ **Performance Optimization**
@@ -172,7 +174,7 @@ workflow_dispatch:
 
 - **Multiple scan types** (static, dynamic, dependency)
 - **Multiple tools** (bandit, pip-audit, trivy)
-- **Multiple trigger points** (CI, CD, scheduled)
+- **Multiple trigger points** (CI, after CI, scheduled)
 
 ### 📊 **Comprehensive Reporting**
 
@@ -215,7 +217,7 @@ make security-pip-audit # Dependency vulnerabilities
 
 ### Common Issues
 
-**Q: Security scan fails after successful CD**
+**Q: Security scan fails after successful CI**
 A: Check if the Docker image was actually published to the registry
 
 **Q: Trivy can't access the image**
@@ -354,7 +356,7 @@ For security vulnerabilities, please follow our [Security Policy](../.github/SEC
 **Solution**: Implemented custom CodeQL configuration with intelligent filtering:
 
 **Architectural Decision**: Instead of creating a separate CodeQL workflow, CodeQL analysis was integrated into the
-existing `security.yml` workflow to maintain the clean separation of concerns (CI → CD → Security) and avoid
+existing `security.yml` workflow to maintain the clean separation of concerns (CI → Security) and avoid
 workflow sprawl.
 
 **Files Added**:

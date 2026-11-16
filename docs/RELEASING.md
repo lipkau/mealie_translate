@@ -1,7 +1,7 @@
 # Releasing
 
 A release is a `vX.Y.Z` tag on a commit on `main`.
-Pushing it makes CI and CD publish the image tags listed in [`DOCKER_IMAGE_STRATEGY.md`](DOCKER_IMAGE_STRATEGY.md),
+Pushing it makes CI publish the image tags listed in [`DOCKER_IMAGE_STRATEGY.md`](DOCKER_IMAGE_STRATEGY.md),
 including `latest`.
 Nothing is deployed from this repository: `lipkau/home.lab` picks the new version up.
 
@@ -48,5 +48,5 @@ git push origin v1.2.3
 gh release create v1.2.3 --title v1.2.3 --notes-file notes.md
 ```
 
-Then check that CD published the version: `gh run list --workflow cd.yml --limit 1`.
-Done when the CD run for the tag succeeded.
+Then check that CI published the version: `gh run list --workflow ci.yml --branch v1.2.3 --limit 1`.
+Done when the CI run for the tag succeeded, including its `Image` job.
