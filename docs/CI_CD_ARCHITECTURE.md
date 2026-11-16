@@ -34,10 +34,11 @@ All published images are identical -- same Dockerfile stage, same dependencies, 
 
 **Security**: Relies on separate Security pipeline for comprehensive vulnerability scanning after deployment
 
-### PR Image Cleanup - `.github/workflows/pr-image-cleanup.yml`
+### Image Cleanup - `.github/workflows/image-cleanup.yml`
 
-**Purpose**: Delete ephemeral PR images from GHCR when a PR is closed
-**Triggers**: `pull_request: closed`
+**Purpose**: Delete stale images from GHCR: images of closed PRs; release, `dev` and `latest` images stay
+**Triggers**: `pull_request: closed`, Mondays, manual (dry run by default)
+**Details**: [Image Cleanup](DOCKER_IMAGE_STRATEGY.md#image-cleanup)
 
 ### 🔒 Security Scanning - `.github/workflows/security.yml`
 

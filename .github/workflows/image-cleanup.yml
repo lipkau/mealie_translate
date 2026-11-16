@@ -1,0 +1,39 @@
+name: Image cleanup
+
+# Deletes stale images from GHCR: images of closed PRs, superseded PR builds,
+# and main builds beyond the newest 10 that are older than 30 days. Release,
+# `latest` and `main` images stay. Untagged images whose tag moved on are only
+# listed in the run summary, since a deployment may still pin one by digest.
+# See https://github.com/lipkau/gh-tools/tree/main/actions/ghcr-cleanup
+
+on:
+  pull_request:
+    types: [closed]
+  schedule:
+    - cron: "17 3 * * 1" # Mondays 03:17 UTC
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Only report what would be deleted
+        type: boolean
+        default: true
+
+permissions: {}
+
+concurrency:
+  group: image-cleanup
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+      pull-requests: read
+    steps:
+      - uses: lipkau/gh-tools/actions/ghcr-cleanup@b7be0b919a5bd01128a48589a12720335e257a1b # feat/ghcr-cleanup, until ghcr-cleanup/v1.0.0
+        with:
+          dry-run: ${{ inputs.dry-run || false }}
+          keep-tags: ^dev$

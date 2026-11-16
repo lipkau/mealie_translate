@@ -46,7 +46,7 @@ flowchart TD
   CI[CI completes] --> gate[gate job]
   gate -->|"tags computed"| build["build (all tags)"]
   build -->|"pr_number set"| comment["Comment on PR"]
-  prClose["PR closed"] --> cleanup["pr-image-cleanup.yml"]
+  prClose["PR closed, and weekly"] --> cleanup["image-cleanup.yml"]
 ```
 
 The `gate` job is lightweight (no Docker setup).
@@ -100,8 +100,17 @@ The gate job's `on_main` check rejects it.
 
 1. PR opened or pushed -- CI runs, CD builds `:pr-<N>`, bot comments on the PR.
 2. Subsequent pushes -- image is rebuilt, comment is updated (not duplicated).
-3. PR closed (merged or not) -- `pr-image-cleanup.yml` deletes the `:pr-<N>`
-   package version from GHCR.
+3. PR closed (merged or not) -- `image-cleanup.yml` deletes the `:pr-<N>` image from GHCR.
+   It also runs every Monday, which catches a build that finished after its PR closed.
+
+## Image Cleanup
+
+`image-cleanup.yml` runs the shared
+[ghcr-cleanup](https://github.com/lipkau/gh-tools/tree/main/actions/ghcr-cleanup) action.
+It deletes images of closed PRs and keeps `dev`, `latest` and release tags.
+Untagged images, such as earlier `dev` builds, are listed in the run summary but not deleted,
+because a deployment may still pin one by digest.
+Run it from the Actions tab to preview: the manual run is a dry run by default.
 
 ## Supply-Chain Attestation
 
