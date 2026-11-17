@@ -209,7 +209,7 @@ jobs:
       packages: write
     steps:
       # `latest` is the newest release from main (the action's default, `latest: release`).
-      - uses: lipkau/gh-tools/actions/container-image@e8890e814bbb58504b95be61aadbfeea101a6c77 # feat/container-image, until container-image/v1.0.0
+      - uses: lipkau/gh-tools/actions/container-image@e3ed36df3d68c66d7ebf27f5ab0d3b0a7cf45af3 # container-image/v1.0.0
 
   # The only check the main branch ruleset requires, so the matrix can change freely.
   # Add every new job to `needs`.
