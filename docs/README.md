@@ -1,7 +1,6 @@
 # Documentation Index
 
 [![CI](https://github.com/lipkau/mealie_translate/actions/workflows/ci.yml/badge.svg)](https://github.com/lipkau/mealie_translate/actions/workflows/ci.yml)
-[![CD](https://github.com/lipkau/mealie_translate/actions/workflows/cd.yml/badge.svg)](https://github.com/lipkau/mealie_translate/actions/workflows/cd.yml)
 [![Security](https://github.com/lipkau/mealie_translate/actions/workflows/security.yml/badge.svg)](https://github.com/lipkau/mealie_translate/actions/workflows/security.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -22,7 +21,7 @@ This directory contains all project documentation for the Mealie Recipe Translat
 
 ## Architecture & Security
 
-- **[CI/CD Architecture](CI_CD_ARCHITECTURE.md)** - Separated pipeline design and deployment workflow
+- **[CI/CD Architecture](CI_CD_ARCHITECTURE.md)** - Workflows, the image job and dependency updates
 - **[Docker Image Strategy](DOCKER_IMAGE_STRATEGY.md)** - Image tagging, build pipeline, and decision matrix
 - **[Security Architecture](SECURITY_ARCHITECTURE.md)** - Multi-layered security scanning and tool migration history
 - **[Artifacts Documentation](ARTIFACTS.md)** - CI/CD pipeline artifacts and retention policies

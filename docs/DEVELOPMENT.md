@@ -320,7 +320,7 @@ Follow [RELEASING.md](RELEASING.md). Pushing the version tag makes GitHub Action
 Published to GitHub Container Registry (GHCR):
 
 - `ghcr.io/lipkau/mealie_translate:latest` (production)
-- `ghcr.io/lipkau/mealie_translate:dev` (development)
+- `ghcr.io/lipkau/mealie_translate:main` (development)
 - `ghcr.io/lipkau/mealie_translate:v1.0.0` (version tags)
 
 ## Best Practices

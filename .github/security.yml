@@ -12,7 +12,7 @@ default_setup_languages: []
 # - Bandit static analysis for Python security issues
 # - pip-audit for dependency vulnerability scanning
 # - Trivy for Docker image security scanning
-# - Dependabot for automated dependency updates
+# - Renovate for automated dependency updates
 
 # To view security findings:
 # - Go to the Security tab in the GitHub repository

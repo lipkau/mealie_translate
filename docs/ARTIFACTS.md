@@ -49,34 +49,9 @@ Our CI/CD pipelines capture comprehensive artifacts for debugging, compliance, a
   - Separate from unit tests for clear reporting
 - **Size**: ~1-10 MB
 
-## 🚀 **CD Pipeline Artifacts** (`cd.yml`)
+## 🚀 **Image Job** (`ci.yml`)
 
-### Build Metadata
-
-- **Artifact Name**: `build-metadata`
-- **Contents**:
-  - `build-metadata.txt` - Build information, git details, image tags
-- **Retention**: 90 days
-- **Usage**: Tracking builds, debugging deployments
-- **Size**: ~1 KB
-
-### Staging Deployment Logs
-
-- **Artifact Name**: `staging-deployment-logs`
-- **Contents**:
-  - `staging-deployment.log` - Deployment timestamps and metadata
-- **Retention**: 30 days
-- **Usage**: Deployment tracking, troubleshooting
-- **Size**: ~1 KB
-
-### Production Deployment Logs
-
-- **Artifact Name**: `production-deployment-logs`
-- **Contents**:
-  - `production-deployment.log` - Production deployment details
-- **Retention**: 90 days
-- **Usage**: Production deployment tracking, compliance
-- **Size**: ~1 KB
+The `Image` job uploads no artifacts. Its job summary lists the image tags and digest it pushed.
 
 ## 🔒 **Security Pipeline Artifacts** (`security.yml`)
 

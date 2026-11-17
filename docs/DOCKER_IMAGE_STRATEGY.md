@@ -5,67 +5,40 @@ in the Mealie Recipe Translator project.
 
 ## Overview
 
-The CD pipeline builds a single image from the default Dockerfile target
-(`runtime`) and applies one or more tags depending on the trigger event.
-All published images are identical -- same base, same dependencies,
+The `Image` job in `.github/workflows/ci.yml` builds the image from the
+default Dockerfile target and pushes it to `ghcr.io/lipkau/mealie_translate`.
+It runs after the Markdown, code quality, unit test and Dockerfile jobs pass,
+and the `CI result` check needs it.
+
+The job uses the shared
+[container-image](https://github.com/lipkau/gh-tools/tree/main/actions/container-image)
+action, so every repository tags its images the same way.
+All published images are identical: same base, same dependencies,
 same entrypoint, same behavior.
-
-The pipeline is defined across two workflow files:
-
-- `cd.yml` -- gate job that computes tags + one build job
-- `_docker-build.yml` -- reusable workflow the build job calls
 
 ## Image Tags
 
-| Tag      | Built from                   | Purpose                   |
-| -------- | ---------------------------- | ------------------------- |
-| `dev`    | push to `main` / version tag | Beta users, staging       |
-| `latest` | version tag on `main`        | Production deployments    |
-| `v1.2.3` | version tag on `main`        | Pinned production version |
-| `pr-<N>` | every PR (automatic)         | Contributor testing       |
+| Build                     | Tags                                                      |
+| ------------------------- | --------------------------------------------------------- |
+| Pull request              | the branch name (`fix/x` → `fix-x`), `sha-<commit>`       |
+| Push to `main`            | `main`, `sha-<commit>`                                    |
+| Version tag `v1.2.3`      | `1.2.3`, `1.2`, `1`, `v1.2.3`, `latest`, `sha-<commit>`   |
+| Version tag `v1.3.0-rc.1` | `1.3.0-rc.1`, `v1.3.0-rc.1`, `sha-<commit>` (no `latest`) |
 
-All tags point to the same Dockerfile stage. There is no difference
-between a `:dev` image and a `:latest` image other than the tag.
+- `latest` is always the newest release. A pre-release never moves it.
+- `main` is the newest validated build of `main`, for beta users and staging.
+- A pull request's `sha-` tag names its head commit.
+- A version tag must point at a commit on `main`. Otherwise the job fails and
+  nothing is published.
 
-## Build Decision Matrix
-
-| Event                 | `:dev` | `:v*` + `:latest` | `:pr-N` | Total builds |
-| --------------------- | ------ | ----------------- | ------- | ------------ |
-| Push to `main`        | yes    | --                | --      | 1            |
-| Version tag on `main` | yes    | yes               | --      | 1            |
-| Pull request          | --     | --                | yes     | 1            |
-| Tag not on `main`     | --     | --                | --      | 0            |
-
-For version-tag releases, one build produces all three tags
-(`:dev`, `:v1.2.3`, `:latest`) from a single image digest.
-
-## Pipeline Architecture
-
-```mermaid
-flowchart TD
-  CI[CI completes] --> gate[gate job]
-  gate -->|"tags computed"| build["build (all tags)"]
-  build -->|"pr_number set"| comment["Comment on PR"]
-  prClose["PR closed, and weekly"] --> cleanup["image-cleanup.yml"]
-```
-
-The `gate` job is lightweight (no Docker setup).
-It determines which tags to apply and passes them as a single
-newline-separated output to the build job.
-
-The build job calls the reusable workflow (`_docker-build.yml`),
-which handles checkout, QEMU, buildx, login, build-push,
-provenance, SBOM, and optional PR commenting.
+Images built before the switch to the shared action also carry `dev`
+(builds of `main`) and `pr-<N>`. Those tags no longer move.
 
 ## Build Scenarios
 
 ### 1. Push to `main` (merge)
 
-```bash
-git push origin main
-```
-
-**Result**: `:dev` image built (multi-arch).
+**Result**: `:main` and `:sha-<commit>`, for amd64 and arm64.
 
 ### 2. Version tag on `main` (release)
 
@@ -74,40 +47,28 @@ git tag -a v1.2.3 -m "Release v1.2.3"
 git push origin v1.2.3
 ```
 
-**Result** (single build, three tags):
+**Result**: one build, tagged `1.2.3`, `1.2`, `1`, `v1.2.3`, `latest` and `sha-<commit>`.
+See [RELEASING.md](RELEASING.md) for the whole release.
 
-- `ghcr.io/lipkau/mealie_translate:v1.2.3`
-- `ghcr.io/lipkau/mealie_translate:latest`
-- `ghcr.io/lipkau/mealie_translate:dev`
+### 3. Pull request
 
-### 3. Pull request (automatic)
-
-Open or push to a PR targeting `main`.
-No manual tagging required.
-
-**Result**:
-
-- `ghcr.io/lipkau/mealie_translate:pr-<N>` (multi-arch)
-- Bot comments the `docker pull` command on the PR
-- Image is updated on every subsequent push to the PR
-
-### 4. Tag not on `main`
-
-A `v*` tag pushed to a commit that is not on `main` produces no images.
-The gate job's `on_main` check rejects it.
+Open or push to a PR targeting `main`. The image is pushed under the
+branch name and `sha-<commit>`, and the job's summary lists both.
+A PR from a fork builds the image without pushing it.
 
 ## PR Image Lifecycle
 
-1. PR opened or pushed -- CI runs, CD builds `:pr-<N>`, bot comments on the PR.
-2. Subsequent pushes -- image is rebuilt, comment is updated (not duplicated).
-3. PR closed (merged or not) -- `image-cleanup.yml` deletes the `:pr-<N>` image from GHCR.
+1. PR opened or pushed: CI builds and pushes the branch's image.
+2. Later pushes: the branch tag moves to the new build.
+3. PR closed (merged or not): `image-cleanup.yml` deletes the branch's images from GHCR.
    It also runs every Monday, which catches a build that finished after its PR closed.
 
 ## Image Cleanup
 
 `image-cleanup.yml` runs the shared
 [ghcr-cleanup](https://github.com/lipkau/gh-tools/tree/main/actions/ghcr-cleanup) action.
-It deletes images of closed PRs and keeps `dev`, `latest` and release tags.
+It deletes images of closed PRs and old builds of `main`. It keeps `main`, `dev`,
+`latest` and release tags.
 Untagged images, such as earlier `dev` builds, are listed in the run summary but not deleted,
 because a deployment may still pin one by digest.
 Run it from the Actions tab to preview: the manual run is a dry run by default.
@@ -116,9 +77,9 @@ Run it from the Actions tab to preview: the manual run is a dry run by default.
 
 All images are built with:
 
-- **SLSA provenance** (`provenance: mode=max`) -- records builder, source, and
+- **SLSA provenance** (`provenance: mode=max`): records builder, source, and
   build instructions.
-- **SBOM** (`sbom: true`) -- generates a Software Bill of Materials via Syft.
+- **SBOM** (`sbom: true`): a Software Bill of Materials.
 
 Inspect with:
 
@@ -126,41 +87,27 @@ Inspect with:
 docker buildx imagetools inspect ghcr.io/lipkau/mealie_translate:latest
 ```
 
-## Cache Strategy
-
-The build job uses the default GHA cache (no scoped partitioning needed
-since all builds share the same Dockerfile target).
-
 ## Concurrency
 
-The CD workflow uses a concurrency group keyed on the triggering branch:
-
-```yaml
-concurrency:
-  group: cd-${{ github.event.workflow_run.head_branch }}
-  cancel-in-progress: true
-```
-
-Rapid pushes to the same branch cancel in-flight CD runs.
-Different version tags each get their own group and never cancel each other.
+A new push to a PR cancels the PR's running CI, including its image build.
+Pushes to `main` and version tags each get their own run and never cancel each other,
+so every one of them publishes its image.
 
 ## Troubleshooting
 
 ### Image not built
 
-1. Check that CI completed successfully (CD only runs on CI success).
-2. For versioned releases, verify the tag follows the `v*` pattern and the
+1. Check that the jobs the `Image` job needs passed.
+2. For a release, check that the tag follows the `v*` pattern and the
    tagged commit is on `main`.
-3. Check the `gate` job logs for the `Decide build tags` step output.
 
 ### PR image not appearing
 
-1. Confirm CI passed for the PR.
-2. Check the `gate` job's `Find associated pull request` step -- the PR must
-   be open at the time CD runs.
+1. Check the `Image` job's summary for the tags.
+2. A PR from a fork is built but not pushed.
 
 ## Related Documentation
 
-- [CI/CD Architecture](CI_CD_ARCHITECTURE.md) -- full pipeline overview
-- [Docker Guide](DOCKER.md) -- container usage and deployment
-- [Development Guide](DEVELOPMENT.md) -- local development setup
+- [CI/CD Architecture](CI_CD_ARCHITECTURE.md): full pipeline overview
+- [Docker Guide](DOCKER.md): container usage and deployment
+- [Development Guide](DEVELOPMENT.md): local development setup
